@@ -18,26 +18,27 @@ const oauth2Client = new OAuth2Client({
 });
 
 function createPacificDateTime(timeString: string): Date {
-  // Create a date object for the current time in Pacific timezone
-  const pacificTime = new Date().toLocaleString("en-US", {
-    timeZone: "America/Los_Angeles"
-  });
-
-  // Get the hours and minutes from the input time string
+  // Parse the time string (HH:mm format)
   const [hours, minutes] = timeString.split(":").map(Number);
 
-  // Create a new date object for Pacific time
-  const eventDate = new Date(pacificTime);
+  // Create a date object for today in Pacific Time
+  const now = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
+  const today = new Date(now);
 
-  // Set the hours and minutes while keeping the current date
-  eventDate.setHours(hours);
-  eventDate.setMinutes(minutes);
-  eventDate.setSeconds(0);
-  eventDate.setMilliseconds(0);
+  // Create a new date with the specified hours and minutes
+  const eventDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    hours,
+    minutes,
+    0,
+    0
+  );
 
   // If the time has already passed today, schedule for tomorrow
-  const now = new Date(pacificTime);
-  if (eventDate < now) {
+  const currentTime = new Date(now);
+  if (eventDate < currentTime) {
     eventDate.setDate(eventDate.getDate() + 1);
   }
 
@@ -201,11 +202,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           summary: task.title,
           description: task.description || "",
           start: {
-            dateTime: startTime.toISOString(),
+            dateTime: format(startTime, "yyyy-MM-dd'T'HH:mm:ss"),
             timeZone: "America/Los_Angeles"
           },
           end: {
-            dateTime: endTime.toISOString(),
+            dateTime: format(endTime, "yyyy-MM-dd'T'HH:mm:ss"),
             timeZone: "America/Los_Angeles"
           }
         };
