@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import CalendarView from "@/components/calendar-view";
-import TaskList from "@/components/task-list";
+import DayView from "@/components/day-view";
 import TaskInput from "@/components/task-input";
 import { Task } from "@shared/schema";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 export default function HomePage() {
   const { user, loading } = useAuth();
@@ -26,30 +26,36 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="container mx-auto p-4">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Welcome, {user.email}</h1>
-          <Button onClick={() => window.location.href = "/api/auth/logout"}>
-            Sign Out
-          </Button>
+          <div className="flex gap-4">
+            <Button 
+              onClick={() => window.location.href = "/api/auth/logout"}
+              variant="outline"
+            >
+              Sign Out
+            </Button>
+            <Button onClick={() => window.location.href = "#"} >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Tasks
+            </Button>
+          </div>
         </div>
 
-        <TaskInput onTasksCreated={refetch} />
+        {/* Main Content */}
+        <div className="flex gap-6">
+          {/* Sidebar - Day View (30%) */}
+          <div className="w-[30%] bg-card rounded-lg p-4 shadow-sm">
+            <DayView tasks={tasks} />
+          </div>
 
-        <Tabs defaultValue="calendar" className="w-full">
-          <TabsList>
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="calendar">
+          {/* Main Content - Calendar View (70%) */}
+          <div className="w-[70%] bg-card rounded-lg p-4 shadow-sm">
             <CalendarView tasks={tasks} />
-          </TabsContent>
-
-          <TabsContent value="tasks">
-            <TaskList tasks={tasks} />
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
     </div>
   );
