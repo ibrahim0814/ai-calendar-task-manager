@@ -38,7 +38,7 @@ interface TaskConfirmationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   tasks: TaskExtract[];
-  onConfirm: (tasks: TaskConfirmData) => void;
+  onConfirm: (tasks: { tasks: TaskExtract[] }) => void;
 }
 
 export function TaskConfirmationDialog({
@@ -47,18 +47,27 @@ export function TaskConfirmationDialog({
   tasks,
   onConfirm,
 }: TaskConfirmationDialogProps) {
+  console.log("TaskConfirmationDialog received tasks:", tasks); // Add logging
+
   const form = useForm<TaskConfirmData>({
     resolver: zodResolver(taskConfirmSchema),
     defaultValues: {
       tasks: tasks.map((task, index) => ({
         ...task,
-        startTime: format(
+        startTime: task.startTime || format(
           new Date(new Date().setHours(9 + index, 0, 0, 0)),
           "HH:mm"
         ),
       })),
     },
   });
+
+  console.log("Form default values:", form.getValues()); // Add logging
+
+  const onSubmit = (data: TaskConfirmData) => {
+    console.log("Submitting task data:", data); // Add logging
+    onConfirm(data);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -71,7 +80,7 @@ export function TaskConfirmationDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onConfirm)} className="space-y-3">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
             <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2">
               {tasks.map((task, index) => (
                 <div key={index} className="p-3 border rounded-lg space-y-3 bg-muted/5">

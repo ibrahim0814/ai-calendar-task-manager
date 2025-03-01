@@ -33,8 +33,9 @@ export type InsertTask = typeof tasks.$inferInsert;
 export const taskExtractSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be in HH:mm format"),
   duration: z.number().min(15).max(480), // duration in minutes
-  priority: z.enum(["high", "medium", "low"]),
+  priority: z.enum(["high", "medium", "low"])
 });
 
 export type TaskExtract = z.infer<typeof taskExtractSchema>;

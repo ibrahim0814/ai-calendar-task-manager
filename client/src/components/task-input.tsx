@@ -21,13 +21,17 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
   const extractMutation = useMutation({
     mutationFn: async (text: string) => {
       const res = await apiRequest("POST", "/api/tasks/extract", { text });
-      return res.json();
+      const data = await res.json();
+      console.log("Extracted tasks from API:", data); // Add logging
+      return data;
     },
     onSuccess: (tasks: TaskExtract[]) => {
+      console.log("Setting extracted tasks:", tasks); // Add logging
       setExtractedTasks(tasks);
       setShowConfirmation(true);
     },
     onError: (error) => {
+      console.error("Task extraction error:", error); // Add logging
       toast({
         title: "Error",
         description: "Failed to extract tasks: " + error.message,
@@ -38,6 +42,7 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: { tasks: TaskExtract[] }) => {
+      console.log("Creating tasks with data:", data); // Add logging
       const res = await apiRequest("POST", "/api/tasks/process", data);
       return res.json();
     },
@@ -51,6 +56,7 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
       });
     },
     onError: (error) => {
+      console.error("Task creation error:", error); // Add logging
       toast({
         title: "Error",
         description: "Failed to process tasks: " + error.message,
@@ -78,12 +84,14 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
         Process Tasks
       </Button>
 
-      <TaskConfirmationDialog
-        isOpen={showConfirmation}
-        onClose={() => setShowConfirmation(false)}
-        tasks={extractedTasks}
-        onConfirm={(data) => createMutation.mutate(data)}
-      />
+      {extractedTasks.length > 0 && ( // Only render dialog if we have tasks
+        <TaskConfirmationDialog
+          isOpen={showConfirmation}
+          onClose={() => setShowConfirmation(false)}
+          tasks={extractedTasks}
+          onConfirm={(tasks) => createMutation.mutate({ tasks })}
+        />
+      )}
     </div>
   );
 }
