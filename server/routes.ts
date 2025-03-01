@@ -37,6 +37,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Received callback with code:", req.query.code ? "present" : "missing");
 
+      if (req.query.error === 'access_denied') {
+        throw new Error("Access denied. Please ensure you are added as a test user in the Google Cloud Console.");
+      }
+
       if (!req.query.code) {
         throw new Error("No authorization code received");
       }
@@ -67,7 +71,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Auth callback error:", {
         message: error.message,
         stack: error.stack,
-        details: error.response?.data
+        details: error.response?.data,
+        query: req.query
       });
       res.redirect("/auth?error=" + encodeURIComponent(error.message));
     }
