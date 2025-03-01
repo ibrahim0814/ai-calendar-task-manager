@@ -13,6 +13,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { TaskExtract } from "@shared/schema";
@@ -61,72 +62,79 @@ export function TaskConfirmationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Confirm Tasks</DialogTitle>
           <DialogDescription>
-            Review and adjust the timing of your tasks before they are added to your calendar.
+            Review and adjust your tasks before they are scheduled.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onConfirm)} className="space-y-4">
-            {tasks.map((task, index) => (
-              <div key={index} className="p-4 border rounded-lg space-y-4">
-                <FormField
-                  control={form.control}
-                  name={`tasks.${index}.title`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onConfirm)} className="space-y-3">
+            <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2">
+              {tasks.map((task, index) => (
+                <div key={index} className="p-3 border rounded-lg space-y-3 bg-muted/5">
                   <FormField
                     control={form.control}
-                    name={`tasks.${index}.startTime`}
+                    name={`tasks.${index}.title`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Start Time</FormLabel>
+                        <FormLabel className="text-sm font-medium">Task {index + 1}</FormLabel>
                         <FormControl>
-                          <Input
-                            type="time"
-                            {...field}
-                          />
+                          <Input {...field} className="text-sm" />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name={`tasks.${index}.duration`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Duration (minutes)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={15}
-                            max={480}
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name={`tasks.${index}.startTime`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Start Time</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="time"
+                              {...field}
+                              className="text-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`tasks.${index}.duration`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Duration (min)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={15}
+                              max={480}
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value))}
+                              className="text-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
-            <DialogFooter>
-              <Button variant="outline" type="button" onClick={onClose}>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
               <Button type="submit">Schedule Tasks</Button>
