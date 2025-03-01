@@ -4,6 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 import { storage } from "./storage";
 import { extractTasks } from "./openai";
 import { calendar_v3, google } from "googleapis";
+import { addDays } from "date-fns";
 import session from "express-session";
 
 const redirectUri = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}/api/auth/callback`;
@@ -164,10 +165,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const task of tasks) {
         console.log("Processing task:", task);
 
-        // Parse the start time from HH:mm format and set to today's date in user's timezone
+        // Parse the start time from HH:mm format
         const [hours, minutes] = task.startTime.split(":").map(Number);
+
+        // Create a new date object for today
         const startTime = new Date();
+        // Set hours and minutes
         startTime.setHours(hours, minutes, 0, 0);
+
+        // If the time has already passed today, schedule it for tomorrow
+        if (startTime < new Date()) {
+          startTime.setTime(addDays(startTime, 1).getTime());
+        }
 
         const endTime = new Date(startTime.getTime() + task.duration * 60000);
 
