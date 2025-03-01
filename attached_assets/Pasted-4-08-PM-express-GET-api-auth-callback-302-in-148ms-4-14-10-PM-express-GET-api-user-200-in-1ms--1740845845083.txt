@@ -1,0 +1,101 @@
+4:08 PM [express] GET /api/auth/callback 302 in 148ms
+4:14:10 PM [express] GET /api/user 200 in 1ms :: {"authenticated":true,"user":{"id":1,"email":"ibrah…
+4:14:10 PM [express] GET /api/tasks 304 in 1ms :: []
+Extracted tasks: [
+  {
+    title: 'Sleep',
+    startTime: '01:00',
+    duration: 240,
+    priority: 'high'
+  },
+  {
+    title: 'Watch LLM Agents Lecture',
+    startTime: '13:00',
+    duration: 90,
+    priority: 'medium'
+  },
+  {
+    title: 'Call Dealership',
+    startTime: '14:30',
+    duration: 15,
+    priority: 'high'
+  },
+  {
+    title: 'Hifz Preparation',
+    startTime: '14:45',
+    duration: 60,
+    priority: 'high'
+  },
+  {
+    title: 'Find Items on Marketplace',
+    startTime: '15:45',
+    duration: 75,
+    priority: 'low'
+  },
+  {
+    title: 'Go to Masjid',
+    startTime: '17:00',
+    duration: 210,
+    priority: 'high'
+  },
+  {
+    title: 'Revision',
+    startTime: '21:00',
+    duration: 20,
+    priority: 'high'
+  },
+  {
+    title: 'Hifz Class',
+    startTime: '21:30',
+    duration: 30,
+    priority: 'high'
+  }
+]
+4:14:44 PM [express] POST /api/tasks/extract 200 in 4974ms :: [{"title":"Sleep","startTime":"01:00",…
+4:14:50 PM [express] GET /api/user 304 in 1ms :: {"authenticated":true,"user":{"id":1,"email":"ibrah…
+4:14:50 PM [express] GET /api/tasks 304 in 0ms :: []
+Task processing error: TypeError: tasks is not iterable
+    at <anonymous> (/home/runner/workspace/server/routes.ts:145:26)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+    at next (/home/runner/workspace/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/home/runner/workspace/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+    at /home/runner/workspace/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:91:12)
+    at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+    at <anonymous> (/home/runner/workspace/server/auth.ts:54:5)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+    at strategy.pass (/home/runner/workspace/node_modules/passport/lib/middleware/authenticate.js:355:9)
+    at SessionStrategy.authenticate (/home/runner/workspace/node_modules/passport/lib/strategies/session.js:126:10)
+    at attempt (/home/runner/workspace/node_modules/passport/lib/middleware/authenticate.js:378:16)
+    at authenticate (/home/runner/workspace/node_modules/passport/lib/middleware/authenticate.js:379:7)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+    at initialize (/home/runner/workspace/node_modules/passport/lib/middleware/initialize.js:98:5)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+    at <anonymous> (/home/runner/workspace/server/index.ts:52:3)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+    at Immediate._onImmediate (/home/runner/workspace/node_modules/express-session/index.js:514:7)
+    at process.processImmediate (node:internal/timers:485:21)
+4:15:44 PM [express] POST /api/tasks/process 500 in 6ms :: {"error":"Failed to process tasks"}
+^C

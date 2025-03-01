@@ -138,8 +138,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const userId = req.session.userId;
-      const tasks = req.body.tasks;
-      const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+      const { tasks } = req.body;
+
+      if (!Array.isArray(tasks)) {
+        throw new Error("Tasks must be an array");
+      }
+
+      console.log("Processing tasks:", tasks); // Add logging
 
       const createdTasks = [];
       for (const task of tasks) {
@@ -157,6 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           end: { dateTime: endTime.toISOString() }
         };
 
+        const calendar = google.calendar({ version: "v3", auth: oauth2Client });
         const calendarEvent = await calendar.events.insert({
           calendarId: "primary",
           requestBody: event
@@ -165,11 +171,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const createdTask = await storage.createTask({
           userId,
           title: task.title,
-          description: task.description,
+          description: task.description || null,
           scheduledStart: startTime,
           scheduledEnd: endTime,
           isScheduled: true,
-          googleEventId: calendarEvent.data.id
+          googleEventId: calendarEvent.data.id || null,
+          createdAt: new Date()
         });
 
         createdTasks.push(createdTask);
