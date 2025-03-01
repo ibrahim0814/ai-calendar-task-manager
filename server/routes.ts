@@ -17,6 +17,33 @@ const oauth2Client = new OAuth2Client({
   redirectUri
 });
 
+function createPacificDateTime(timeString: string): Date {
+  // Create a date object for the current time in Pacific timezone
+  const pacificTime = new Date().toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles"
+  });
+
+  // Get the hours and minutes from the input time string
+  const [hours, minutes] = timeString.split(":").map(Number);
+
+  // Create a new date object for Pacific time
+  const eventDate = new Date(pacificTime);
+
+  // Set the hours and minutes while keeping the current date
+  eventDate.setHours(hours);
+  eventDate.setMinutes(minutes);
+  eventDate.setSeconds(0);
+  eventDate.setMilliseconds(0);
+
+  // If the time has already passed today, schedule for tomorrow
+  const now = new Date(pacificTime);
+  if (eventDate < now) {
+    eventDate.setDate(eventDate.getDate() + 1);
+  }
+
+  return eventDate;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure session middleware if not already configured
   if (!app._router || !app._router.stack.some((layer: any) => layer.name === 'session')) {
@@ -165,40 +192,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const task of tasks) {
         console.log("Processing task:", task);
 
-        // Get the current date in local time
-        const today = new Date();
-        const [hours, minutes] = task.startTime.split(":").map(Number);
-
-        // Create a new date object for the task's start time
-        const startTime = new Date(today);
-        startTime.setHours(hours, minutes, 0, 0);
-
-        // If the time has already passed today, schedule for tomorrow
-        if (startTime < new Date()) {
-          startTime.setDate(startTime.getDate() + 1);
-        }
-
-        // Calculate end time based on duration
+        // Create start and end times in Pacific Time
+        const startTime = createPacificDateTime(task.startTime);
         const endTime = new Date(startTime.getTime() + task.duration * 60000);
-
-        // Get user's timezone
-        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-        // Format times in RFC3339 with the user's timezone
-        const startDateTime = startTime.toLocaleString('en-US', { timeZone: userTimeZone });
-        const endDateTime = endTime.toLocaleString('en-US', { timeZone: userTimeZone });
 
         // Create Google Calendar event
         const event = {
           summary: task.title,
           description: task.description || "",
           start: {
-            dateTime: new Date(startDateTime).toISOString(),
-            timeZone: userTimeZone
+            dateTime: startTime.toISOString(),
+            timeZone: "America/Los_Angeles"
           },
           end: {
-            dateTime: new Date(endDateTime).toISOString(),
-            timeZone: userTimeZone
+            dateTime: endTime.toISOString(),
+            timeZone: "America/Los_Angeles"
           }
         };
 

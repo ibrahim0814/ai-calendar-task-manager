@@ -99,6 +99,9 @@ export function TaskConfirmationDialog({
       });
 
       await onConfirm(tasksWithDuration);
+    } catch (error) {
+      console.error("Failed to schedule tasks:", error);
+      throw error; // Let the parent component handle the error
     } finally {
       setIsSubmitting(false);
     }
