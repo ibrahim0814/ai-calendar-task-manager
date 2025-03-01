@@ -19,7 +19,7 @@ export default function AuthPage() {
         <div className="w-full max-w-sm space-y-6">
           <div className="space-y-2 text-center">
             <h1 className="text-3xl font-bold">Welcome</h1>
-            <p className="text-gray-500">Sign in to manage your calendar</p>
+            <p className="text-muted-foreground">Sign in to manage your calendar</p>
           </div>
 
           {error && (
@@ -41,7 +41,7 @@ export default function AuthPage() {
         </div>
       </div>
 
-      <div className="hidden lg:block bg-gray-100">
+      <div className="hidden lg:block bg-muted/50"> 
         <div className="h-full flex items-center justify-center p-8">
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">AI Calendar Assistant</h2>
