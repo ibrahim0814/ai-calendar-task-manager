@@ -1,0 +1,271 @@
+xtracted tasks: [
+  {
+    title: 'Watch lecture on LLM agents',
+    startTime: '13:00',
+    duration: 90,
+    priority: 'high'
+  },
+  {
+    title: 'Hifz preparation',
+    startTime: '14:30',
+    duration: 60,
+    priority: 'high'
+  },
+  {
+    title: 'Call dealership',
+    startTime: '15:30',
+    duration: 15,
+    priority: 'medium'
+  },
+  {
+    title: 'Find items on Marketplace',
+    startTime: '15:45',
+    duration: 75,
+    priority: 'low'
+  },
+  {
+    title: 'Revision before Hifz class',
+    startTime: '21:00',
+    duration: 15,
+    priority: 'medium'
+  },
+  {
+    title: 'Hifz class',
+    startTime: '21:30',
+    duration: 30,
+    priority: 'high'
+  }
+]
+4:37:14 PM [express] POST /api/tasks/extract 200 in 3109ms :: [{"title":"Watch lecture on LLM agents…
+Processing tasks: [
+  {
+    title: 'Watch lecture on LLM agents',
+    description: '',
+    startTime: '13:00',
+    duration: 90,
+    priority: 'high'
+  },
+  {
+    title: 'Hifz preparation',
+    description: '',
+    startTime: '14:30',
+    duration: 60,
+    priority: 'high'
+  },
+  {
+    title: 'Call dealership',
+    description: '',
+    startTime: '15:30',
+    duration: 15,
+    priority: 'medium'
+  },
+  {
+    title: 'Find items on Marketplace',
+    description: '',
+    startTime: '15:45',
+    duration: 75,
+    priority: 'low'
+  },
+  {
+    title: 'Revision before Hifz class',
+    description: '',
+    startTime: '21:00',
+    duration: 15,
+    priority: 'medium'
+  },
+  {
+    title: 'Hifz class',
+    description: '',
+    startTime: '21:30',
+    duration: 30,
+    priority: 'high'
+  }
+]
+Processing task: {
+  title: 'Watch lecture on LLM agents',
+  description: '',
+  startTime: '13:00',
+  duration: 90,
+  priority: 'high'
+}
+Creating calendar event: {
+  summary: 'Watch lecture on LLM agents',
+  description: '',
+  start: { dateTime: '2025-03-02T13:00:00.000Z', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T14:30:00.000Z', timeZone: 'UTC' }
+}
+Calendar event created: {
+  kind: 'calendar#event',
+  etag: '"3481694098396766"',
+  id: 'ouecv039eeaad323nnq5vu5av0',
+  status: 'confirmed',
+  htmlLink: 'https://www.google.com/calendar/event?eid=b3VlY3YwMzllZWFhZDMyM25ucTV2dTVhdjAgaWJyYWhpbS4wODE0QG0',
+  created: '2025-03-01T16:37:28.000Z',
+  updated: '2025-03-01T16:37:29.198Z',
+  summary: 'Watch lecture on LLM agents',
+  creator: { email: 'ibrahim.0814@gmail.com', self: true },
+  organizer: { email: 'ibrahim.0814@gmail.com', self: true },
+  start: { dateTime: '2025-03-02T05:00:00-08:00', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T06:30:00-08:00', timeZone: 'UTC' },
+  iCalUID: 'ouecv039eeaad323nnq5vu5av0@google.com',
+  sequence: 0,
+  reminders: { useDefault: true },
+  eventType: 'default'
+}
+Processing task: {
+  title: 'Hifz preparation',
+  description: '',
+  startTime: '14:30',
+  duration: 60,
+  priority: 'high'
+}
+Creating calendar event: {
+  summary: 'Hifz preparation',
+  description: '',
+  start: { dateTime: '2025-03-02T14:30:00.000Z', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T15:30:00.000Z', timeZone: 'UTC' }
+}
+Calendar event created: {
+  kind: 'calendar#event',
+  etag: '"3481694099330302"',
+  id: 'ihm78u2o61chon6m5vseovtcec',
+  status: 'confirmed',
+  htmlLink: 'https://www.google.com/calendar/event?eid=aWhtNzh1Mm82MWNob242bTV2c2VvdnRjZWMgaWJyYWhpbS4wODE0QG0',
+  created: '2025-03-01T16:37:29.000Z',
+  updated: '2025-03-01T16:37:29.665Z',
+  summary: 'Hifz preparation',
+  creator: { email: 'ibrahim.0814@gmail.com', self: true },
+  organizer: { email: 'ibrahim.0814@gmail.com', self: true },
+  start: { dateTime: '2025-03-02T06:30:00-08:00', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T07:30:00-08:00', timeZone: 'UTC' },
+  iCalUID: 'ihm78u2o61chon6m5vseovtcec@google.com',
+  sequence: 0,
+  reminders: { useDefault: true },
+  eventType: 'default'
+}
+Processing task: {
+  title: 'Call dealership',
+  description: '',
+  startTime: '15:30',
+  duration: 15,
+  priority: 'medium'
+}
+Creating calendar event: {
+  summary: 'Call dealership',
+  description: '',
+  start: { dateTime: '2025-03-02T15:30:00.000Z', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T15:45:00.000Z', timeZone: 'UTC' }
+}
+Calendar event created: {
+  kind: 'calendar#event',
+  etag: '"3481694099904958"',
+  id: '9pooo9vrgoo10d170or473lb0g',
+  status: 'confirmed',
+  htmlLink: 'https://www.google.com/calendar/event?eid=OXBvb285dnJnb28xMGQxNzBvcjQ3M2xiMGcgaWJyYWhpbS4wODE0QG0',
+  created: '2025-03-01T16:37:29.000Z',
+  updated: '2025-03-01T16:37:29.952Z',
+  summary: 'Call dealership',
+  creator: { email: 'ibrahim.0814@gmail.com', self: true },
+  organizer: { email: 'ibrahim.0814@gmail.com', self: true },
+  start: { dateTime: '2025-03-02T07:30:00-08:00', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T07:45:00-08:00', timeZone: 'UTC' },
+  iCalUID: '9pooo9vrgoo10d170or473lb0g@google.com',
+  sequence: 0,
+  reminders: { useDefault: true },
+  eventType: 'default'
+}
+Processing task: {
+  title: 'Find items on Marketplace',
+  description: '',
+  startTime: '15:45',
+  duration: 75,
+  priority: 'low'
+}
+Creating calendar event: {
+  summary: 'Find items on Marketplace',
+  description: '',
+  start: { dateTime: '2025-03-02T15:45:00.000Z', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T17:00:00.000Z', timeZone: 'UTC' }
+}
+Calendar event created: {
+  kind: 'calendar#event',
+  etag: '"3481694100843134"',
+  id: 'nbi21dms570thosccsk07he704',
+  status: 'confirmed',
+  htmlLink: 'https://www.google.com/calendar/event?eid=bmJpMjFkbXM1NzB0aG9zY2NzazA3aGU3MDQgaWJyYWhpbS4wODE0QG0',
+  created: '2025-03-01T16:37:30.000Z',
+  updated: '2025-03-01T16:37:30.421Z',
+  summary: 'Find items on Marketplace',
+  creator: { email: 'ibrahim.0814@gmail.com', self: true },
+  organizer: { email: 'ibrahim.0814@gmail.com', self: true },
+  start: { dateTime: '2025-03-02T07:45:00-08:00', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-02T09:00:00-08:00', timeZone: 'UTC' },
+  iCalUID: 'nbi21dms570thosccsk07he704@google.com',
+  sequence: 0,
+  reminders: { useDefault: true },
+  eventType: 'default'
+}
+Processing task: {
+  title: 'Revision before Hifz class',
+  description: '',
+  startTime: '21:00',
+  duration: 15,
+  priority: 'medium'
+}
+Creating calendar event: {
+  summary: 'Revision before Hifz class',
+  description: '',
+  start: { dateTime: '2025-03-01T21:00:00.000Z', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-01T21:15:00.000Z', timeZone: 'UTC' }
+}
+Calendar event created: {
+  kind: 'calendar#event',
+  etag: '"3481694101479966"',
+  id: 'gib2ba2gbuf5a39fpmsjf5918o',
+  status: 'confirmed',
+  htmlLink: 'https://www.google.com/calendar/event?eid=Z2liMmJhMmdidWY1YTM5ZnBtc2pmNTkxOG8gaWJyYWhpbS4wODE0QG0',
+  created: '2025-03-01T16:37:30.000Z',
+  updated: '2025-03-01T16:37:30.739Z',
+  summary: 'Revision before Hifz class',
+  creator: { email: 'ibrahim.0814@gmail.com', self: true },
+  organizer: { email: 'ibrahim.0814@gmail.com', self: true },
+  start: { dateTime: '2025-03-01T13:00:00-08:00', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-01T13:15:00-08:00', timeZone: 'UTC' },
+  iCalUID: 'gib2ba2gbuf5a39fpmsjf5918o@google.com',
+  sequence: 0,
+  reminders: { useDefault: true },
+  eventType: 'default'
+}
+Processing task: {
+  title: 'Hifz class',
+  description: '',
+  startTime: '21:30',
+  duration: 30,
+  priority: 'high'
+}
+Creating calendar event: {
+  summary: 'Hifz class',
+  description: '',
+  start: { dateTime: '2025-03-01T21:30:00.000Z', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-01T22:00:00.000Z', timeZone: 'UTC' }
+}
+Calendar event created: {
+  kind: 'calendar#event',
+  etag: '"3481694102448798"',
+  id: 'igp8ko0o9smudvr9kte85mbnvs',
+  status: 'confirmed',
+  htmlLink: 'https://www.google.com/calendar/event?eid=aWdwOGtvMG85c211ZHZyOWt0ZTg1bWJudnMgaWJyYWhpbS4wODE0QG0',
+  created: '2025-03-01T16:37:30.000Z',
+  updated: '2025-03-01T16:37:31.224Z',
+  summary: 'Hifz class',
+  creator: { email: 'ibrahim.0814@gmail.com', self: true },
+  organizer: { email: 'ibrahim.0814@gmail.com', self: true },
+  start: { dateTime: '2025-03-01T13:30:00-08:00', timeZone: 'UTC' },
+  end: { dateTime: '2025-03-01T14:00:00-08:00', timeZone: 'UTC' },
+  iCalUID: 'igp8ko0o9smudvr9kte85mbnvs@google.com',
+  sequence: 0,
+  reminders: { useDefault: true },
+  eventType: 'default'
+}
+4:37:31 PM [express] POST /api/tasks/process 200 in 2523ms :: [{"userId":1,"title":"Watch lecture on…
+4:37:31 PM [express] GET /api/tasks 200 in 1ms :: [{"userId":1,"title":"Watch lecture on LLM agents"…

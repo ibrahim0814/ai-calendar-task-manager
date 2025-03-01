@@ -4,7 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 import { storage } from "./storage";
 import { extractTasks } from "./openai";
 import { calendar_v3, google } from "googleapis";
-import { addDays } from "date-fns";
+import { addDays, parse, format } from "date-fns";
 import session from "express-session";
 
 const redirectUri = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}/api/auth/callback`;
@@ -165,34 +165,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const task of tasks) {
         console.log("Processing task:", task);
 
-        // Parse the start time from HH:mm format
+        // Get the current date in local time
+        const today = new Date();
         const [hours, minutes] = task.startTime.split(":").map(Number);
 
-        // Create a new date object for today
-        const startTime = new Date();
-        // Set hours and minutes
+        // Create a new date object for the task's start time
+        const startTime = new Date(today);
         startTime.setHours(hours, minutes, 0, 0);
 
-        // If the time has already passed today, schedule it for tomorrow
+        // If the time has already passed today, schedule for tomorrow
         if (startTime < new Date()) {
-          startTime.setTime(addDays(startTime, 1).getTime());
+          startTime.setDate(startTime.getDate() + 1);
         }
 
+        // Calculate end time based on duration
         const endTime = new Date(startTime.getTime() + task.duration * 60000);
 
         // Get user's timezone
         const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        // Format times in RFC3339 with the user's timezone
+        const startDateTime = startTime.toLocaleString('en-US', { timeZone: userTimeZone });
+        const endDateTime = endTime.toLocaleString('en-US', { timeZone: userTimeZone });
 
         // Create Google Calendar event
         const event = {
           summary: task.title,
           description: task.description || "",
           start: {
-            dateTime: startTime.toISOString(),
+            dateTime: new Date(startDateTime).toISOString(),
             timeZone: userTimeZone
           },
           end: {
-            dateTime: endTime.toISOString(),
+            dateTime: new Date(endDateTime).toISOString(),
             timeZone: userTimeZone
           }
         };
