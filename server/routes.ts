@@ -144,10 +144,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("Tasks must be an array");
       }
 
-      console.log("Processing tasks:", tasks); // Add logging
+      console.log("Processing tasks:", tasks);
 
+      // Get user to retrieve Google tokens
+      const user = await storage.getUser(userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Set up OAuth2 client with user's tokens
+      oauth2Client.setCredentials({
+        access_token: user.accessToken,
+        refresh_token: user.refreshToken
+      });
+
+      const calendar = google.calendar({ version: "v3", auth: oauth2Client });
       const createdTasks = [];
+
       for (const task of tasks) {
+        console.log("Processing task:", task);
+
         // Parse the start time from HH:mm format
         const [hours, minutes] = task.startTime.split(":").map(Number);
         const startTime = new Date();
@@ -155,37 +171,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const endTime = new Date(startTime.getTime() + task.duration * 60000);
 
+        // Create Google Calendar event
         const event = {
           summary: task.title,
-          description: task.description,
-          start: { dateTime: startTime.toISOString() },
-          end: { dateTime: endTime.toISOString() }
+          description: task.description || "",
+          start: {
+            dateTime: startTime.toISOString(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          },
+          end: {
+            dateTime: endTime.toISOString(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          }
         };
 
-        const calendar = google.calendar({ version: "v3", auth: oauth2Client });
-        const calendarEvent = await calendar.events.insert({
-          calendarId: "primary",
-          requestBody: event
-        });
+        console.log("Creating calendar event:", event);
 
-        const createdTask = await storage.createTask({
-          userId,
-          title: task.title,
-          description: task.description || null,
-          scheduledStart: startTime,
-          scheduledEnd: endTime,
-          isScheduled: true,
-          googleEventId: calendarEvent.data.id || null,
-          createdAt: new Date()
-        });
+        try {
+          const calendarEvent = await calendar.events.insert({
+            calendarId: "primary",
+            requestBody: event
+          });
 
-        createdTasks.push(createdTask);
+          console.log("Calendar event created:", calendarEvent.data);
+
+          const createdTask = await storage.createTask({
+            userId,
+            title: task.title,
+            description: task.description || null,
+            scheduledStart: startTime,
+            scheduledEnd: endTime,
+            isScheduled: true,
+            googleEventId: calendarEvent.data.id || null,
+            createdAt: new Date()
+          });
+
+          createdTasks.push(createdTask);
+        } catch (error) {
+          console.error("Failed to create calendar event:", error);
+          throw new Error(`Failed to create calendar event: ${error.message}`);
+        }
       }
 
       res.json(createdTasks);
     } catch (error) {
       console.error("Task processing error:", error);
-      res.status(500).json({ error: "Failed to process tasks" });
+      res.status(500).json({ 
+        error: "Failed to process tasks",
+        details: error.message 
+      });
     }
   });
 

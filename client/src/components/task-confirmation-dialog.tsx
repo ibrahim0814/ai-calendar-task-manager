@@ -79,15 +79,21 @@ export function TaskConfirmationDialog({
       const endDate = parse(task.endTime, "HH:mm", new Date());
       const durationInMinutes = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60));
 
+      // Ensure duration is positive
+      if (durationInMinutes <= 0) {
+        throw new Error(`Invalid duration for task "${task.title}": end time must be after start time`);
+      }
+
       return {
         title: task.title,
-        description: task.description,
+        description: task.description || "",
         startTime: task.startTime,
         duration: durationInMinutes,
         priority: task.priority
       };
     });
 
+    console.log("Submitting tasks:", tasksWithDuration);
     onConfirm({ tasks: tasksWithDuration });
   };
 
