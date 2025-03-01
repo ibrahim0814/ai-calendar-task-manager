@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast"; // Fixed import path
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 import { TaskConfirmationDialog } from "./task-confirmation-dialog";
@@ -22,28 +22,30 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
     mutationFn: async (text: string) => {
       const res = await apiRequest("POST", "/api/tasks/extract", { text });
       const data = await res.json();
-      console.log("Extracted tasks from API:", data); // Add logging
       return data;
     },
     onSuccess: (tasks: TaskExtract[]) => {
-      console.log("Setting extracted tasks:", tasks); // Add logging
       setExtractedTasks(tasks);
       setShowConfirmation(true);
     },
     onError: (error) => {
-      console.error("Task extraction error:", error); // Add logging
+      console.error("Task extraction error:", error);
       toast({
         title: "Error",
-        description: "Failed to extract tasks: " + error.message,
+        description: "Failed to extract tasks from your input",
         variant: "destructive",
       });
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { tasks: TaskExtract[] }) => {
-      console.log("Creating tasks with data:", data); // Add logging
-      const res = await apiRequest("POST", "/api/tasks/process", data);
+    mutationFn: async (tasks: TaskExtract[]) => {
+      console.log("Creating tasks:", tasks);
+      const res = await apiRequest("POST", "/api/tasks/process", { tasks });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.details || "Failed to process tasks");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -51,15 +53,15 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
       setShowConfirmation(false);
       onTasksCreated();
       toast({
-        title: "Tasks created",
+        title: "Success",
         description: "Your tasks have been scheduled successfully",
       });
     },
     onError: (error) => {
-      console.error("Task creation error:", error); // Add logging
+      console.error("Task creation error:", error);
       toast({
         title: "Error",
-        description: "Failed to process tasks: " + error.message,
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -84,12 +86,12 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
         Process Tasks
       </Button>
 
-      {extractedTasks.length > 0 && ( // Only render dialog if we have tasks
+      {extractedTasks.length > 0 && (
         <TaskConfirmationDialog
           isOpen={showConfirmation}
           onClose={() => setShowConfirmation(false)}
           tasks={extractedTasks}
-          onConfirm={(tasks) => createMutation.mutate({ tasks })}
+          onConfirm={(tasks) => createMutation.mutate(tasks)}
         />
       )}
     </div>

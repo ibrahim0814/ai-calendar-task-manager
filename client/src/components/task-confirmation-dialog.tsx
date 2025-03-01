@@ -39,7 +39,7 @@ interface TaskConfirmationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   tasks: TaskExtract[];
-  onConfirm: (tasks: { tasks: TaskExtract[] }) => void;
+  onConfirm: (tasks: TaskExtract[]) => void;
 }
 
 export function TaskConfirmationDialog({
@@ -93,13 +93,12 @@ export function TaskConfirmationDialog({
       };
     });
 
-    console.log("Submitting tasks:", tasksWithDuration);
-    onConfirm({ tasks: tasksWithDuration });
+    onConfirm(tasksWithDuration);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl"> {/* Made dialog wider */}
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Confirm Tasks</DialogTitle>
           <DialogDescription>
