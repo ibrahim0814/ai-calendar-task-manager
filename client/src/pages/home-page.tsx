@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 
 export default function HomePage() {
   const { user, loading } = useAuth();
+  const [showTaskInput, setShowTaskInput] = useState(false);
   const { data: tasks = [], refetch } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
     enabled: !!user
@@ -37,12 +38,28 @@ export default function HomePage() {
             >
               Sign Out
             </Button>
-            <Button onClick={() => window.location.href = "#"} >
+            <Button onClick={() => setShowTaskInput(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Tasks
             </Button>
           </div>
         </div>
+
+        {/* Task Input Section */}
+        {showTaskInput && (
+          <div className="mb-6 bg-card rounded-lg p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Add New Tasks</h2>
+              <Button variant="ghost" onClick={() => setShowTaskInput(false)}>
+                Close
+              </Button>
+            </div>
+            <TaskInput onTasksCreated={() => {
+              setShowTaskInput(false);
+              refetch();
+            }} />
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="flex gap-6">
