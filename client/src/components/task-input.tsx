@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/components/ui/use-toast";
+import { apiRequest } from "@/lib/api"; // Corrected import path
 import { Loader2 } from "lucide-react";
 import { TaskConfirmationDialog } from "./task-confirmation-dialog";
 import { TaskExtract } from "@shared/schema";
