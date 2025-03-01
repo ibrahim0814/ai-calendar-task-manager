@@ -1,15 +1,13 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { SiGoogle } from "react-icons/si";
-import { Redirect, useLocation } from "wouter";
+import { Redirect } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
 export default function AuthPage() {
   const { user } = useAuth();
-  const [, params] = useLocation();
-  const searchParams = new URLSearchParams(params);
-  const error = searchParams.get('error');
+  const error = new URLSearchParams(window.location.search).get('error');
 
   if (user) {
     return <Redirect to="/" />;
