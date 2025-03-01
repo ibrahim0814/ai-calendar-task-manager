@@ -5,10 +5,12 @@ import { storage } from "./storage";
 import { extractTasks } from "./openai";
 import { calendar_v3, google } from "googleapis";
 
+const redirectUri = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}/api/auth/callback`;
+
 const oauth2Client = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri: process.env.REPLIT_DOMAINS?.split(",")[0] + "/api/auth/callback"
+  redirectUri
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -27,7 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { tokens } = await oauth2Client.getToken(req.query.code as string);
       oauth2Client.setCredentials(tokens);
-      
+
       const userInfo = await google.oauth2("v2").userinfo.get({ auth: oauth2Client });
       const email = userInfo.data.email!;
       const googleId = userInfo.data.id!;
@@ -45,6 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
       res.redirect("/");
     } catch (error) {
+      console.error("Auth error:", error);
       res.status(500).send("Authentication failed");
     }
   });
@@ -54,12 +57,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tasks = await extractTasks(req.body.text);
       const userId = req.session.userId!;
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
-      
+
       const createdTasks = [];
       for (const task of tasks) {
         const now = new Date();
         const startTime = new Date(now.setHours(9, 0, 0, 0));
-        
+
         const event = {
           summary: task.title,
           description: task.description,
@@ -89,6 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(createdTasks);
     } catch (error) {
+      console.error("Task processing error:", error);
       res.status(500).json({ error: "Failed to process tasks" });
     }
   });
