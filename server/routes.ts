@@ -164,12 +164,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const task of tasks) {
         console.log("Processing task:", task);
 
-        // Parse the start time from HH:mm format
+        // Parse the start time from HH:mm format and set to today's date in user's timezone
         const [hours, minutes] = task.startTime.split(":").map(Number);
         const startTime = new Date();
         startTime.setHours(hours, minutes, 0, 0);
 
         const endTime = new Date(startTime.getTime() + task.duration * 60000);
+
+        // Get user's timezone
+        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
         // Create Google Calendar event
         const event = {
@@ -177,11 +180,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: task.description || "",
           start: {
             dateTime: startTime.toISOString(),
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            timeZone: userTimeZone
           },
           end: {
             dateTime: endTime.toISOString(),
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            timeZone: userTimeZone
           }
         };
 

@@ -22,6 +22,8 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format, addMinutes, parse } from "date-fns";
 import { Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
 
 const taskConfirmSchema = z.object({
   tasks: z.array(z.object({
@@ -48,6 +50,7 @@ export function TaskConfirmationDialog({
   tasks: initialTasks,
   onConfirm,
 }: TaskConfirmationDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm<TaskConfirmData>({
     resolver: zodResolver(taskConfirmSchema),
     defaultValues: {
@@ -72,28 +75,33 @@ export function TaskConfirmationDialog({
     form.setValue("tasks", newTasks);
   };
 
-  const onSubmit = (data: TaskConfirmData) => {
-    // Convert endTime back to duration for API compatibility
-    const tasksWithDuration = data.tasks.map(task => {
-      const startDate = parse(task.startTime, "HH:mm", new Date());
-      const endDate = parse(task.endTime, "HH:mm", new Date());
-      const durationInMinutes = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60));
+  const onSubmit = async (data: TaskConfirmData) => {
+    try {
+      setIsSubmitting(true);
+      // Convert endTime back to duration for API compatibility
+      const tasksWithDuration = data.tasks.map(task => {
+        const startDate = parse(task.startTime, "HH:mm", new Date());
+        const endDate = parse(task.endTime, "HH:mm", new Date());
+        const durationInMinutes = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60));
 
-      // Ensure duration is positive
-      if (durationInMinutes <= 0) {
-        throw new Error(`Invalid duration for task "${task.title}": end time must be after start time`);
-      }
+        // Ensure duration is positive
+        if (durationInMinutes <= 0) {
+          throw new Error(`Invalid duration for task "${task.title}": end time must be after start time`);
+        }
 
-      return {
-        title: task.title,
-        description: task.description || "",
-        startTime: task.startTime,
-        duration: durationInMinutes,
-        priority: task.priority
-      };
-    });
+        return {
+          title: task.title,
+          description: task.description || "",
+          startTime: task.startTime,
+          duration: durationInMinutes,
+          priority: task.priority
+        };
+      });
 
-    onConfirm(tasksWithDuration);
+      await onConfirm(tasksWithDuration);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -181,7 +189,16 @@ export function TaskConfirmationDialog({
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit">Schedule Tasks</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Scheduling...
+                  </>
+                ) : (
+                  'Schedule Tasks'
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </Form>
