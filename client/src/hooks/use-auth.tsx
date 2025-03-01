@@ -1,43 +1,48 @@
-import { createContext, ReactNode, useContext } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { User } from "@shared/schema";
-import { getQueryFn } from "../lib/queryClient";
+import { createContext, useContext, useState, useEffect } from "react";
+import { getCurrentUser, type AuthState, type User } from "@/utils/google-utils";
 
-type AuthContextType = {
+interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
-  error: Error | null;
-};
+  loading: boolean;
+}
 
-export const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+});
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const {
-    data: user,
-    error,
-    isLoading,
-  } = useQuery<User | undefined, Error>({
-    queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadUserFromAPI() {
+      try {
+        const authState: AuthState = await getCurrentUser();
+
+        if (authState.authenticated && authState.user) {
+          setUser(authState.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Failed to load user:", error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadUserFromAPI();
+  }, []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user: user ?? null,
-        isLoading,
-        error,
-      }}
-    >
+    <AuthContext.Provider value={{ user, loading }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  return useContext(AuthContext);
 }

@@ -11,10 +11,14 @@ app.use(express.urlencoded({ extended: false }));
 
 // Add session middleware HERE
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key', // Replace with a strong secret key in production
+  secret: process.env.SESSION_SECRET || 'your-secret-key', 
   resave: false,
   saveUninitialized: true,
-  cookie: { secure: process.env.NODE_ENV === 'production' } // Set secure to true in production
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  },
+  store: storage.sessionStore
 }))
 
 app.use((req, res, next) => {

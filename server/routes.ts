@@ -74,12 +74,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email,
           googleId,
           accessToken: tokens.access_token!,
-          refreshToken: tokens.refresh_token!
+          refreshToken: tokens.refresh_token || ''  // Handle missing refresh token
         });
         console.log("Created new user account for:", email);
       }
 
+      // Make sure session is initialized before setting properties
+      if (!req.session) {
+        req.session = {} as any;
+      }
+      
       req.session.userId = user.id;
+      await new Promise<void>((resolve) => {
+        req.session.save(() => {
+          console.log("Session saved with userId:", user.id);
+          resolve();
+        });
+      });
+      
       res.redirect("/");
     } catch (error: any) {
       console.error("Auth callback error:", {
@@ -137,8 +149,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/user", async (req, res) => {
+    try {
+      if (!req.session || !req.session.userId) {
+        return res.json({ authenticated: false });
+      }
+      
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.json({ authenticated: false });
+      }
+      
+      return res.json({ 
+        authenticated: true, 
+        user: { 
+          id: user.id, 
+          email: user.email 
+        } 
+      });
+    } catch (error) {
+      console.error("Error getting user info:", error);
+      return res.status(500).json({ error: "Failed to get user info" });
+    }
+  });
+
   app.get("/api/tasks", async (req, res) => {
-    const userId = req.session.userId!;
+    if (!req.session || !req.session.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    const userId = req.session.userId;
     const tasks = await storage.getTasksByUserId(userId);
     res.json(tasks);
   });

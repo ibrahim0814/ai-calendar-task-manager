@@ -21,23 +21,13 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
-  // Configure session middleware
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "dev-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    },
-  };
-
+  // Don't configure session middleware again - it's already set up in index.ts
+  
   if (process.env.NODE_ENV === "production") {
     app.set("trust proxy", 1);
   }
 
-  app.use(session(sessionSettings));
+  // Initialize passport
   app.use(passport.initialize());
   app.use(passport.session());
 
