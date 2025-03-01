@@ -54,6 +54,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.query.error === 'access_denied') {
         throw new Error("Access denied. Please ensure you are added as a test user in the Google Cloud Console.");
       }
+      
+      if (!req.query.code) {
+        throw new Error("No authorization code received");
+      }
+      
+      const { tokens } = await oauth2Client.getToken(req.query.code as string);
+      oauth2Client.setCredentials(tokens);
+      
+      // Get user info from Google
+      const oauth2 = google.oauth2({
+        auth: oauth2Client,
+        version: 'v2'
+      });
+      
+      const userInfo = await oauth2.userinfo.get();
+      
+      if (!userInfo.data.email || !userInfo.data.id) {
+        throw new Error("Failed to get user information from Google");
+      }
+      
+      console.log("Successfully authenticated user:", userInfo.data.email);
+      
+      // Find or create user
+      let user = await storage.getUserByGoogleId(userInfo.data.id);
+      
+      if (!user) {
+        user = await storage.createUser({
+          email: userInfo.data.email,
+          googleId: userInfo.data.id,
+          accessToken: tokens.access_token || '',
+          refreshToken: tokens.refresh_token || ''
+        });
+      }
+      
+      // Set user ID in session
+      if (req.session) {
+        req.session.userId = user.id;
+      } else {
+        throw new Error("Session is not available");
+      }
 
       if (!req.query.code) {
         throw new Error("No authorization code received");
