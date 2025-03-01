@@ -74,51 +74,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("Failed to get user information from Google");
       }
       
-      console.log("Successfully authenticated user:", userInfo.data.email);
-      
-      // Find or create user
-      let user = await storage.getUserByGoogleId(userInfo.data.id);
-      
-      if (!user) {
-        user = await storage.createUser({
-          email: userInfo.data.email,
-          googleId: userInfo.data.id,
-          accessToken: tokens.access_token || '',
-          refreshToken: tokens.refresh_token || ''
-        });
-      }
-      
-      // Set user ID in session
-      if (req.session) {
-        req.session.userId = user.id;
-      } else {
-        throw new Error("Session is not available");
-      }
-
-      if (!req.query.code) {
-        throw new Error("No authorization code received");
-      }
-
-      const { tokens } = await oauth2Client.getToken(req.query.code as string);
-      oauth2Client.setCredentials(tokens);
-
-      const userInfo = await google.oauth2("v2").userinfo.get({ auth: oauth2Client });
       const email = userInfo.data.email!;
       const googleId = userInfo.data.id!;
-
+      
       console.log("Successfully authenticated user:", email);
-
+      
+      // Find or create user
       let user = await storage.getUserByGoogleId(googleId);
+      
       if (!user) {
         user = await storage.createUser({
           email,
           googleId,
-          accessToken: tokens.access_token!,
-          refreshToken: tokens.refresh_token || ''  // Handle missing refresh token
+          accessToken: tokens.access_token || '',
+          refreshToken: tokens.refresh_token || ''
         });
         console.log("Created new user account for:", email);
       }
-
+      
       // Make sure session is initialized before setting properties
       if (!req.session) {
         req.session = {} as any;
