@@ -117,24 +117,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/tasks/extract", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const tasks = await extractTasks(req.body.text);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Task extraction error:", error);
+      res.status(500).json({ error: "Failed to extract tasks" });
+    }
+  });
+
   app.post("/api/tasks/process", async (req, res) => {
     try {
-      const tasks = await extractTasks(req.body.text);
-      const userId = req.session.userId!;
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const userId = req.session.userId;
+      const tasks = req.body.tasks;
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
       const createdTasks = [];
       for (const task of tasks) {
-        const now = new Date();
-        const startTime = new Date(now.setHours(9, 0, 0, 0));
+        // Parse the start time from HH:mm format
+        const [hours, minutes] = task.startTime.split(":").map(Number);
+        const startTime = new Date();
+        startTime.setHours(hours, minutes, 0, 0);
+
+        const endTime = new Date(startTime.getTime() + task.duration * 60000);
 
         const event = {
           summary: task.title,
           description: task.description,
           start: { dateTime: startTime.toISOString() },
-          end: { 
-            dateTime: new Date(startTime.getTime() + task.duration * 60000).toISOString() 
-          }
+          end: { dateTime: endTime.toISOString() }
         };
 
         const calendarEvent = await calendar.events.insert({
@@ -147,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           title: task.title,
           description: task.description,
           scheduledStart: startTime,
-          scheduledEnd: new Date(startTime.getTime() + task.duration * 60000),
+          scheduledEnd: endTime,
           isScheduled: true,
           googleEventId: calendarEvent.data.id
         });

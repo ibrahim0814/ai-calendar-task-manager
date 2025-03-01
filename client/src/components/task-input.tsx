@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
+import { TaskConfirmationDialog } from "./task-confirmation-dialog";
+import { TaskExtract } from "@shared/schema";
 
 interface TaskInputProps {
   onTasksCreated: () => void;
@@ -12,15 +14,36 @@ interface TaskInputProps {
 
 export default function TaskInput({ onTasksCreated }: TaskInputProps) {
   const [text, setText] = useState("");
+  const [extractedTasks, setExtractedTasks] = useState<TaskExtract[]>([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const { toast } = useToast();
 
-  const mutation = useMutation({
+  const extractMutation = useMutation({
     mutationFn: async (text: string) => {
-      const res = await apiRequest("POST", "/api/tasks/process", { text });
+      const res = await apiRequest("POST", "/api/tasks/extract", { text });
+      return res.json();
+    },
+    onSuccess: (tasks: TaskExtract[]) => {
+      setExtractedTasks(tasks);
+      setShowConfirmation(true);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to extract tasks: " + error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { tasks: TaskExtract[] }) => {
+      const res = await apiRequest("POST", "/api/tasks/process", data);
       return res.json();
     },
     onSuccess: () => {
       setText("");
+      setShowConfirmation(false);
       onTasksCreated();
       toast({
         title: "Tasks created",
@@ -45,15 +68,22 @@ export default function TaskInput({ onTasksCreated }: TaskInputProps) {
         className="min-h-[100px]"
       />
       <Button
-        onClick={() => mutation.mutate(text)}
-        disabled={mutation.isPending || !text.trim()}
+        onClick={() => extractMutation.mutate(text)}
+        disabled={extractMutation.isPending || !text.trim()}
         className="w-full"
       >
-        {mutation.isPending ? (
+        {extractMutation.isPending ? (
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
         ) : null}
         Process Tasks
       </Button>
+
+      <TaskConfirmationDialog
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        tasks={extractedTasks}
+        onConfirm={(data) => createMutation.mutate(data)}
+      />
     </div>
   );
 }
