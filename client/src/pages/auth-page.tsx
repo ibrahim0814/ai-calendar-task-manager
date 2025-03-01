@@ -1,10 +1,15 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { SiGoogle } from "react-icons/si";
-import { Redirect } from "wouter";
+import { Redirect, useLocation } from "wouter";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function AuthPage() {
   const { user } = useAuth();
+  const [, params] = useLocation();
+  const searchParams = new URLSearchParams(params);
+  const error = searchParams.get('error');
 
   if (user) {
     return <Redirect to="/" />;
@@ -18,6 +23,15 @@ export default function AuthPage() {
             <h1 className="text-3xl font-bold">Welcome</h1>
             <p className="text-gray-500">Sign in to manage your calendar</p>
           </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Authentication failed: {decodeURIComponent(error)}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Button
             className="w-full"

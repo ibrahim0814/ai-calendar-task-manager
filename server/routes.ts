@@ -7,6 +7,8 @@ import { calendar_v3, google } from "googleapis";
 
 const redirectUri = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}/api/auth/callback`;
 
+console.log("Configured redirect URI:", redirectUri);
+
 const oauth2Client = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -15,24 +17,38 @@ const oauth2Client = new OAuth2Client({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/google", (req, res) => {
-    const url = oauth2Client.generateAuthUrl({
-      access_type: "offline",
-      scope: [
-        "https://www.googleapis.com/auth/calendar",
-        "https://www.googleapis.com/auth/userinfo.email"
-      ]
-    });
-    res.redirect(url);
+    try {
+      const url = oauth2Client.generateAuthUrl({
+        access_type: "offline",
+        scope: [
+          "https://www.googleapis.com/auth/calendar",
+          "https://www.googleapis.com/auth/userinfo.email"
+        ]
+      });
+      console.log("Generated auth URL:", url);
+      res.redirect(url);
+    } catch (error) {
+      console.error("Error generating auth URL:", error);
+      res.status(500).send("Failed to initialize authentication");
+    }
   });
 
   app.get("/api/auth/callback", async (req, res) => {
     try {
+      console.log("Received callback with code:", req.query.code ? "present" : "missing");
+
+      if (!req.query.code) {
+        throw new Error("No authorization code received");
+      }
+
       const { tokens } = await oauth2Client.getToken(req.query.code as string);
       oauth2Client.setCredentials(tokens);
 
       const userInfo = await google.oauth2("v2").userinfo.get({ auth: oauth2Client });
       const email = userInfo.data.email!;
       const googleId = userInfo.data.id!;
+
+      console.log("Successfully authenticated user:", email);
 
       let user = await storage.getUserByGoogleId(googleId);
       if (!user) {
@@ -42,13 +58,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           accessToken: tokens.access_token!,
           refreshToken: tokens.refresh_token!
         });
+        console.log("Created new user account for:", email);
       }
 
       req.session.userId = user.id;
       res.redirect("/");
-    } catch (error) {
-      console.error("Auth error:", error);
-      res.status(500).send("Authentication failed");
+    } catch (error: any) {
+      console.error("Auth callback error:", {
+        message: error.message,
+        stack: error.stack,
+        details: error.response?.data
+      });
+      res.redirect("/auth?error=" + encodeURIComponent(error.message));
     }
   });
 
