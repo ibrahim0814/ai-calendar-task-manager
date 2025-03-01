@@ -1,10 +1,21 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import {setupAuth} from "./auth";
+
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Add session middleware HERE
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key', // Replace with a strong secret key in production
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' } // Set secure to true in production
+}))
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -37,6 +48,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  //Setup Authentication Middleware
+  setupAuth(app);
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

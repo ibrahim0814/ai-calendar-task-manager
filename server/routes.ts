@@ -1,9 +1,10 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { OAuth2Client } from "google-auth-library";
 import { storage } from "./storage";
 import { extractTasks } from "./openai";
 import { calendar_v3, google } from "googleapis";
+import session from "express-session";
 
 const redirectUri = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}/api/auth/callback`;
 
@@ -16,6 +17,19 @@ const oauth2Client = new OAuth2Client({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Configure session middleware if not already configured
+  if (!app._router || !app._router.stack.some((layer: any) => layer.name === 'session')) {
+    app.use(session({
+      secret: process.env.SESSION_SECRET || "dev-secret-key",
+      resave: false,
+      saveUninitialized: false,
+      store: storage.sessionStore,
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      },
+    }));
+  }
   app.get("/api/auth/google", (req, res) => {
     try {
       const url = oauth2Client.generateAuthUrl({
