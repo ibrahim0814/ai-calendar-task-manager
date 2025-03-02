@@ -2,13 +2,23 @@ import { NextResponse } from "next/server"
 import { OpenAI } from "openai"
 import { auth } from "@/lib/auth"
 import { google } from "googleapis"
+import { z } from "zod"
 
 const openai = new OpenAI()
+
+// Task extraction schema
+const taskExtractSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  duration: z.number().min(15).max(480),
+  priority: z.enum(["high", "medium", "low"])
+})
 
 export async function POST(req: Request) {
   try {
     const session = await auth()
-    if (!session) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 })
     }
 
@@ -17,7 +27,7 @@ export async function POST(req: Request) {
 
     // Extract tasks using OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
@@ -28,12 +38,6 @@ export async function POST(req: Request) {
           content: text
         }
       ],
-      function_call: {
-        name: "extractTasks",
-        arguments: JSON.stringify({
-          tasks: []
-        })
-      },
       functions: [
         {
           name: "extractTasks",
@@ -48,8 +52,8 @@ export async function POST(req: Request) {
                   properties: {
                     title: { type: "string" },
                     description: { type: "string" },
-                    startTime: { type: "string" },
-                    duration: { type: "number" },
+                    startTime: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+                    duration: { type: "number", minimum: 15, maximum: 480 },
                     priority: { type: "string", enum: ["high", "medium", "low"] }
                   },
                   required: ["title", "startTime", "duration", "priority"]
@@ -59,7 +63,8 @@ export async function POST(req: Request) {
             required: ["tasks"]
           }
         }
-      ]
+      ],
+      function_call: { name: "extractTasks" }
     })
 
     const functionCall = completion.choices[0].message.function_call
@@ -68,7 +73,10 @@ export async function POST(req: Request) {
     }
 
     const { tasks } = JSON.parse(functionCall.arguments)
-    const validTasks = tasks.filter((task: any) => task.duration > 0)
+    // Validate tasks with zod schema
+    const validTasks = tasks
+      .filter((task: any) => task.duration > 0)
+      .map((task: any) => taskExtractSchema.parse(task))
 
     // Schedule tasks in Google Calendar
     const oauth2Client = new google.auth.OAuth2()
@@ -80,7 +88,7 @@ export async function POST(req: Request) {
     const calendar = google.calendar({ version: "v3", auth: oauth2Client })
 
     const scheduledTasks = await Promise.all(
-      validTasks.map(async (task: any) => {
+      validTasks.map(async (task) => {
         const [hours, minutes] = task.startTime.split(":").map(Number)
         const startTime = new Date()
         startTime.setHours(hours, minutes, 0)
@@ -118,14 +126,17 @@ export async function POST(req: Request) {
     return NextResponse.json(scheduledTasks)
   } catch (error) {
     console.error("Error processing tasks:", error)
-    return new NextResponse("Internal Server Error", { status: 500 })
+    return new NextResponse(
+      error instanceof Error ? error.message : "Internal Server Error", 
+      { status: 500 }
+    )
   }
 }
 
 export async function GET(req: Request) {
   try {
     const session = await auth()
-    if (!session) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 })
     }
 
@@ -162,6 +173,9 @@ export async function GET(req: Request) {
     return NextResponse.json(events)
   } catch (error) {
     console.error("Error fetching tasks:", error)
-    return new NextResponse("Internal Server Error", { status: 500 })
+    return new NextResponse(
+      error instanceof Error ? error.message : "Internal Server Error", 
+      { status: 500 }
+    )
   }
 }
