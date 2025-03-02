@@ -7,14 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { TaskExtract } from "@shared/schema";
 import { format } from "date-fns";
@@ -22,8 +14,6 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
 
 const HOUR_HEIGHT = 60; // pixels per hour
 const MINUTES_PER_HOUR = 60;
@@ -39,17 +29,6 @@ interface TaskConfirmationDialogProps {
 
 type ViewMode = 'calendar' | 'list';
 
-// Form schema for list view
-const formSchema = z.object({
-  tasks: z.array(z.object({
-    title: z.string(),
-    startTime: z.string(),
-    duration: z.number(),
-    description: z.string().optional(),
-    priority: z.string()
-  }))
-});
-
 export function TaskConfirmationDialog({
   isOpen,
   onClose,
@@ -59,16 +38,6 @@ export function TaskConfirmationDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [tasks, setTasks] = useState(initialTasks);
-
-  const form = useForm({
-    defaultValues: {
-      tasks: initialTasks.map(task => ({
-        ...task,
-        startTime: task.startTime,
-        duration: task.duration,
-      }))
-    }
-  });
 
   // Fetch existing calendar events
   const { data: existingEvents } = useQuery({
@@ -160,15 +129,10 @@ export function TaskConfirmationDialog({
     );
   });
 
-  const onSubmit = async (data: any) => {
-    try {
-      setIsSubmitting(true);
-      await onConfirm(viewMode === 'calendar' ? tasks : data.tasks);
-    } catch (error) {
-      console.error("Failed to schedule tasks:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const onSubmit = async () => {
+    setIsSubmitting(true);
+    await onConfirm(tasks);
+    setIsSubmitting(false);
   };
 
   return (
@@ -195,7 +159,7 @@ export function TaskConfirmationDialog({
             </div>
           </div>
           <DialogDescription>
-            {viewMode === 'calendar' 
+            {viewMode === 'calendar'
               ? 'Drag tasks to adjust their timing. Gray blocks show existing events.'
               : 'Edit task details directly. All times are in 15-minute increments.'
             }
@@ -205,7 +169,7 @@ export function TaskConfirmationDialog({
         <div className="flex-1 min-h-[500px] max-h-[calc(80vh-12rem)] overflow-y-auto pr-2">
           {viewMode === 'calendar' ? (
             <div className="relative h-[720px]">
-              <div 
+              <div
                 className="absolute inset-0 ml-14"
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
@@ -271,65 +235,53 @@ export function TaskConfirmationDialog({
               </div>
             </div>
           ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                {tasks.map((task, index) => (
-                  <div key={index} className="p-4 border rounded-lg space-y-3">
-                    <FormField
-                      control={form.control}
-                      name={`tasks.${index}.title`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Title</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+            <div className="space-y-4">
+              {tasks.map((task, index) => (
+                <div key={index} className="p-4 border rounded-lg space-y-3">
+                  <div>
+                    <label className="text-sm font-medium">Title</label>
+                    <Input
+                      value={task.title}
+                      onChange={(e) => {
+                        const updatedTasks = [...tasks];
+                        updatedTasks[index] = { ...task, title: e.target.value };
+                        setTasks(updatedTasks);
+                      }}
                     />
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name={`tasks.${index}.startTime`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Start Time</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="time" 
-                                step="900"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Start Time</label>
+                      <Input
+                        type="time"
+                        step="900"
+                        value={task.startTime}
+                        onChange={(e) => {
+                          const updatedTasks = [...tasks];
+                          updatedTasks[index] = { ...task, startTime: e.target.value };
+                          setTasks(updatedTasks);
+                        }}
                       />
-                      <FormField
-                        control={form.control}
-                        name={`tasks.${index}.duration`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Duration (minutes)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                min="15" 
-                                max="480" 
-                                step="15" 
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Duration (minutes)</label>
+                      <Input
+                        type="number"
+                        min="15"
+                        max="480"
+                        step="15"
+                        value={task.duration}
+                        onChange={(e) => {
+                          const updatedTasks = [...tasks];
+                          updatedTasks[index] = { ...task, duration: Number(e.target.value) };
+                          setTasks(updatedTasks);
+                        }}
                       />
                     </div>
                   </div>
-                ))}
-              </form>
-            </Form>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
@@ -337,10 +289,7 @@ export function TaskConfirmationDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
-            onClick={viewMode === 'list' ? form.handleSubmit(onSubmit) : () => onSubmit({ tasks })} 
-            disabled={isSubmitting}
-          >
+          <Button onClick={onSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
