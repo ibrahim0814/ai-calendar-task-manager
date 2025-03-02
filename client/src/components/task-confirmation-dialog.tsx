@@ -63,6 +63,14 @@ export function TaskConfirmationDialog({
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
   };
 
+  // Format time in 12-hour format with AM/PM
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+  };
+
   const handleDragStart = (e: React.DragEvent, taskIndex: number) => {
     e.dataTransfer.setData('text/plain', String(taskIndex));
   };
@@ -100,6 +108,9 @@ export function TaskConfirmationDialog({
     try {
       setIsSubmitting(true);
       await onConfirm(tasks);
+    } catch (error) {
+      console.error("Failed to schedule tasks:", error);
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
@@ -113,10 +124,10 @@ export function TaskConfirmationDialog({
     return (
       <div
         key={hour}
-        className="absolute w-full border-t border-border"
+        className="absolute w-full border-t border-border/50"
         style={{ top: `${hour * HOUR_HEIGHT}px` }}
       >
-        <span className="text-xs text-muted-foreground -mt-2 inline-block">
+        <span className="absolute -mt-3 -ml-12 w-10 text-right text-xs text-muted-foreground">
           {displayHour} {isAM ? 'AM' : 'PM'}
         </span>
       </div>
@@ -135,7 +146,7 @@ export function TaskConfirmationDialog({
 
         <div className="relative h-[600px] overflow-y-auto mt-4">
           <div 
-            className="absolute inset-0"
+            className="absolute inset-0 ml-14"
             onDragOver={handleDragOver}
             onDrop={handleDrop}
           >
@@ -152,14 +163,20 @@ export function TaskConfirmationDialog({
               return (
                 <div
                   key={`existing-${index}`}
-                  className="absolute left-0 right-0 bg-muted/50 rounded"
+                  className="absolute left-0 right-4 bg-muted/30 hover:bg-muted/40 border border-border/50 rounded-md shadow-sm"
                   style={{
                     top: `${minutesToPixels(startMinutes)}px`,
                     height: `${minutesToPixels(duration)}px`,
+                    minHeight: '24px',
                   }}
                 >
-                  <div className="p-2 text-xs text-muted-foreground">
-                    {event.title}
+                  <div className="p-2">
+                    <div className="font-medium text-sm text-muted-foreground truncate">
+                      {event.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground/80">
+                      {format(start, "h:mm a")} - {format(end, "h:mm a")}
+                    </div>
                   </div>
                 </div>
               );
@@ -171,18 +188,21 @@ export function TaskConfirmationDialog({
               return (
                 <div
                   key={`task-${index}`}
-                  className="absolute left-0 right-0 bg-primary/20 border border-primary/50 rounded cursor-move"
+                  className="absolute left-0 right-4 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded-md shadow-sm cursor-move"
                   style={{
                     top: `${minutesToPixels(startMinutes)}px`,
                     height: `${minutesToPixels(task.duration)}px`,
+                    minHeight: '24px',
                   }}
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
                 >
-                  <div className="p-2 text-xs">
-                    <div className="font-medium">{task.title}</div>
-                    <div className="text-muted-foreground">
-                      {task.startTime} - {minutesToTime(startMinutes + task.duration)}
+                  <div className="p-2">
+                    <div className="font-medium text-sm truncate">
+                      {task.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatTime(task.startTime)} - {formatTime(minutesToTime(startMinutes + task.duration))}
                     </div>
                   </div>
                 </div>
