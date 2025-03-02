@@ -23,7 +23,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
 const HOUR_HEIGHT = 60; // pixels per hour
@@ -38,12 +37,6 @@ interface TaskConfirmationDialogProps {
   onConfirm: (tasks: TaskExtract[]) => void;
 }
 
-const taskSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be in HH:mm format"),
-  duration: z.number().min(15).max(480)
-});
-
 type ViewMode = 'calendar' | 'list';
 
 export function TaskConfirmationDialog({
@@ -53,15 +46,8 @@ export function TaskConfirmationDialog({
   onConfirm,
 }: TaskConfirmationDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tasks, setTasks] = useState(initialTasks);
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
-
-  const form = useForm({
-    resolver: zodResolver(taskSchema),
-    defaultValues: {
-      tasks: initialTasks
-    }
-  });
+  const [tasks, setTasks] = useState(initialTasks);
 
   // Fetch existing calendar events
   const { data: existingEvents } = useQuery({
@@ -127,17 +113,13 @@ export function TaskConfirmationDialog({
     setTasks(updatedTasks);
   };
 
-  const handleSubmit = async () => {
-    try {
-      setIsSubmitting(true);
-      await onConfirm(tasks);
-    } catch (error) {
-      console.error("Failed to schedule tasks:", error);
-      throw error;
-    } finally {
-      setIsSubmitting(false);
+  const listForm = useForm({
+    defaultValues: {
+      tasks: tasks.map(task => ({
+        ...task,
+      }))
     }
-  };
+  });
 
   // Generate markers for hours and half hours
   const timeMarkers = Array.from({ length: HOURS_IN_DAY * 2 }, (_, i) => {
@@ -167,7 +149,7 @@ export function TaskConfirmationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <div className="flex justify-between items-center">
             <DialogTitle>Confirm Tasks</DialogTitle>
@@ -196,134 +178,138 @@ export function TaskConfirmationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {viewMode === 'calendar' ? (
-          <div className="relative h-[500px] overflow-y-auto mt-4">
-            <div 
-              className="absolute inset-0 ml-14"
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-            >
-              {timeMarkers}
+        <div className="flex-1 min-h-0 max-h-[calc(80vh-8rem)] overflow-y-auto">
+          {viewMode === 'calendar' ? (
+            <div className="relative h-[720px]">
+              <div 
+                className="absolute inset-0 ml-14"
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+              >
+                {timeMarkers}
 
-              {/* Existing events in gray */}
-              {existingEvents?.map((event: any, index: number) => {
-                if (!event.scheduledStart || !event.scheduledEnd) return null;
-                const start = new Date(event.scheduledStart);
-                const end = new Date(event.scheduledEnd);
-                const startMinutes = start.getHours() * 60 + start.getMinutes();
-                const duration = (end.getTime() - start.getTime()) / (1000 * 60);
+                {/* Existing events in gray */}
+                {existingEvents?.map((event: any, index: number) => {
+                  if (!event.scheduledStart || !event.scheduledEnd) return null;
+                  const start = new Date(event.scheduledStart);
+                  const end = new Date(event.scheduledEnd);
+                  const startMinutes = start.getHours() * 60 + start.getMinutes();
+                  const duration = (end.getTime() - start.getTime()) / (1000 * 60);
 
-                return (
-                  <div
-                    key={`existing-${index}`}
-                    className="absolute left-0 right-4 bg-muted/30 hover:bg-muted/40 border border-border/50 rounded-md shadow-sm"
-                    style={{
-                      top: `${minutesToPixels(startMinutes)}px`,
-                      height: `${minutesToPixels(duration)}px`,
-                      minHeight: '24px',
-                    }}
-                  >
-                    <div className="p-2">
-                      <div className="font-medium text-sm text-muted-foreground truncate">
-                        {event.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground/80">
-                        {format(start, "h:mm a")} - {format(end, "h:mm a")}
+                  return (
+                    <div
+                      key={`existing-${index}`}
+                      className="absolute left-0 right-4 bg-muted/30 hover:bg-muted/40 border border-border/50 rounded-md shadow-sm"
+                      style={{
+                        top: `${minutesToPixels(startMinutes)}px`,
+                        height: `${minutesToPixels(duration)}px`,
+                        minHeight: '24px',
+                      }}
+                    >
+                      <div className="p-2">
+                        <div className="font-medium text-sm text-muted-foreground truncate">
+                          {event.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground/80">
+                          {format(start, "h:mm a")} - {format(end, "h:mm a")}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
-              {/* New tasks being scheduled */}
-              {tasks.map((task, index) => {
-                const startMinutes = timeToMinutes(task.startTime);
-                return (
-                  <div
-                    key={`task-${index}`}
-                    className="absolute left-0 right-4 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded-md shadow-sm cursor-move"
-                    style={{
-                      top: `${minutesToPixels(startMinutes)}px`,
-                      height: `${minutesToPixels(task.duration)}px`,
-                      minHeight: '24px',
-                    }}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                  >
-                    <div className="p-2">
-                      <div className="font-medium text-sm truncate">
-                        {task.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatTime(task.startTime)} - {formatTime(minutesToTime(startMinutes + task.duration))}
+                {/* New tasks being scheduled */}
+                {tasks.map((task, index) => {
+                  const startMinutes = timeToMinutes(task.startTime);
+                  return (
+                    <div
+                      key={`task-${index}`}
+                      className="absolute left-0 right-4 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded-md shadow-sm cursor-move"
+                      style={{
+                        top: `${minutesToPixels(startMinutes)}px`,
+                        height: `${minutesToPixels(task.duration)}px`,
+                        minHeight: '24px',
+                      }}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                    >
+                      <div className="p-2">
+                        <div className="font-medium text-sm truncate">
+                          {task.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatTime(task.startTime)} - {formatTime(minutesToTime(startMinutes + task.duration))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 space-y-4 max-h-[500px] overflow-y-auto">
-            {tasks.map((task, index) => (
-              <div key={index} className="p-4 border rounded-lg space-y-3">
-                <FormField
-                  control={form.control}
-                  name={`tasks.${index}.title`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`tasks.${index}.startTime`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Time</FormLabel>
-                        <FormControl>
-                          <Input type="time" step="900" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`tasks.${index}.duration`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Duration (minutes)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="15" 
-                            max="480" 
-                            step="15" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ) : (
+            <Form {...listForm}>
+              <form className="space-y-4">
+                {tasks.map((task, index) => (
+                  <div key={index} className="p-4 border rounded-lg space-y-3">
+                    <FormField
+                      control={listForm.control}
+                      name={`tasks.${index}.title`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Title</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={listForm.control}
+                        name={`tasks.${index}.startTime`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Time</FormLabel>
+                            <FormControl>
+                              <Input type="time" step="900" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={listForm.control}
+                        name={`tasks.${index}.duration`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Duration (minutes)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="15" 
+                                max="480" 
+                                step="15" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </form>
+            </Form>
+          )}
+        </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button onClick={() => onConfirm(tasks)} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
