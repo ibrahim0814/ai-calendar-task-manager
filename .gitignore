@@ -22,3 +22,4 @@ next-env.d.ts
 server/public
 vite.config.ts.*
 *.tar.gz
+*.tsbuildinfo
