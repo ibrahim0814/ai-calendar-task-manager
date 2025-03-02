@@ -36,12 +36,6 @@ function createPacificDateTime(timeString: string): Date {
     0
   );
 
-  // If the time has already passed today, schedule for tomorrow
-  const currentTime = new Date(now);
-  if (eventDate < currentTime) {
-    eventDate.setDate(eventDate.getDate() + 1);
-  }
-
   return eventDate;
 }
 
@@ -202,11 +196,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           summary: task.title,
           description: task.description || "",
           start: {
-            dateTime: format(startTime, "yyyy-MM-dd'T'HH:mm:ss"),
+            dateTime: format(startTime, "yyyy-MM-dd'T'HH:mm:ssXXX"),
             timeZone: "America/Los_Angeles"
           },
           end: {
-            dateTime: format(endTime, "yyyy-MM-dd'T'HH:mm:ss"),
+            dateTime: format(endTime, "yyyy-MM-dd'T'HH:mm:ssXXX"),
             timeZone: "America/Los_Angeles"
           }
         };
@@ -233,14 +227,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           createdTasks.push(createdTask);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Failed to create calendar event:", error);
           throw new Error(`Failed to create calendar event: ${error.message}`);
         }
       }
 
       res.json(createdTasks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Task processing error:", error);
       res.status(500).json({ 
         error: "Failed to process tasks",

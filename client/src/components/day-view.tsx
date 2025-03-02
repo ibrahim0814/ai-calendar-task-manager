@@ -8,14 +8,18 @@ interface DayViewProps {
 }
 
 export default function DayView({ tasks }: DayViewProps) {
-  const today = new Date();
+  // Get today's date in Pacific Time
+  const today = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
+  const todayDate = new Date(today);
+
   const todaysTasks = tasks.filter(task => {
     if (!task.scheduledStart) return false;
     const taskDate = new Date(task.scheduledStart);
+    const taskInPT = new Date(taskDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
     return (
-      taskDate.getDate() === today.getDate() &&
-      taskDate.getMonth() === today.getMonth() &&
-      taskDate.getFullYear() === today.getFullYear()
+      taskInPT.getDate() === todayDate.getDate() &&
+      taskInPT.getMonth() === todayDate.getMonth() &&
+      taskInPT.getFullYear() === todayDate.getFullYear()
     );
   });
 
@@ -27,9 +31,9 @@ export default function DayView({ tasks }: DayViewProps) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">
-        Today's Schedule - {format(today, "MMMM d")}
+        Today's Schedule - {format(todayDate, "MMMM d")}
       </h2>
-      
+
       <div className="space-y-3">
         {todaysTasks.length === 0 ? (
           <p className="text-muted-foreground text-sm">No tasks scheduled for today</p>
@@ -50,16 +54,16 @@ export default function DayView({ tasks }: DayViewProps) {
                   </Button>
                 </div>
               </div>
-              
+
               {task.scheduledStart && (
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(task.scheduledStart), "h:mm a")}
+                  {format(new Date(task.scheduledStart).toLocaleString("en-US", { timeZone: "America/Los_Angeles" }), "h:mm a")}
                   {task.scheduledEnd && (
-                    <> - {format(new Date(task.scheduledEnd), "h:mm a")}</>
+                    <> - {format(new Date(task.scheduledEnd).toLocaleString("en-US", { timeZone: "America/Los_Angeles" }), "h:mm a")}</>
                   )}
                 </p>
               )}
-              
+
               {task.description && (
                 <p className="text-sm text-muted-foreground">{task.description}</p>
               )}
