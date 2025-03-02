@@ -194,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create Google Calendar event
         const event = {
           summary: task.title,
-          description: task.description || "",
+          description: task.description ? `${task.description}\n\n[Created by AI Calendar Assistant]` : '[Created by AI Calendar Assistant]',
           start: {
             dateTime: format(startTime, "yyyy-MM-dd'T'HH:mm:ssXXX"),
             timeZone: "America/Los_Angeles"
@@ -271,10 +271,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.session || !req.session.userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    
-    const userId = req.session.userId;
-    const tasks = await storage.getTasksByUserId(userId);
-    res.json(tasks);
+
+    try {
+      const userId = req.session.userId;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Get stored tasks
+      const storedTasks = await storage.getTasksByUserId(userId);
+
+      // Set up OAuth2 client with user's tokens
+      oauth2Client.setCredentials({
+        access_token: user.accessToken,
+        refresh_token: user.refreshToken
+      });
+
+      const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+      // Get events for today in Pacific Time
+      const now = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
+      const today = new Date(now);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const events = await calendar.events.list({
+        calendarId: 'primary',
+        timeMin: format(today, "yyyy-MM-dd'T'00:00:00XXX"),
+        timeMax: format(tomorrow, "yyyy-MM-dd'T'00:00:00XXX"),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
+
+      // Convert calendar events to tasks
+      const calendarTasks = events.data.items?.map(event => ({
+        id: event.id,
+        userId,
+        title: event.summary || 'Untitled Event',
+        description: event.description || null,
+        scheduledStart: event.start?.dateTime ? new Date(event.start.dateTime) : null,
+        scheduledEnd: event.end?.dateTime ? new Date(event.end.dateTime) : null,
+        isScheduled: true,
+        googleEventId: event.id,
+        createdAt: event.created ? new Date(event.created) : new Date(),
+        isAICreated: event.description?.includes('[Created by AI Calendar Assistant]') || false
+      })) || [];
+
+      res.json(calendarTasks);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
   });
 
   const httpServer = createServer(app);

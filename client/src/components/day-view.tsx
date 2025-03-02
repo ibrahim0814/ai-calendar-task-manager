@@ -2,6 +2,7 @@ import { Task } from "@shared/schema";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Trash2, Edit2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DayViewProps {
   tasks: Task[];
@@ -41,7 +42,10 @@ export default function DayView({ tasks }: DayViewProps) {
           todaysTasks.map((task) => (
             <div
               key={task.id}
-              className="p-3 border rounded-lg space-y-2 bg-background hover:bg-accent/5 transition-colors"
+              className={cn(
+                "p-3 border rounded-lg space-y-2 bg-background hover:bg-accent/5 transition-colors",
+                task.isAICreated && "border-primary/50"
+              )}
             >
               <div className="flex justify-between items-start">
                 <h3 className="font-medium">{task.title}</h3>
@@ -66,6 +70,10 @@ export default function DayView({ tasks }: DayViewProps) {
 
               {task.description && (
                 <p className="text-sm text-muted-foreground">{task.description}</p>
+              )}
+
+              {task.isAICreated && (
+                <div className="text-xs text-primary/70">AI Assistant Task</div>
               )}
             </div>
           ))
