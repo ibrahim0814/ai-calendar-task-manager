@@ -8,6 +8,11 @@ const nextConfig = {
   experimental: {
     serverActions: true,
   },
+  // Configure server to listen on port 5000
+  server: {
+    port: 5000,
+    host: '0.0.0.0',
+  },
 }
 
 export default nextConfig
