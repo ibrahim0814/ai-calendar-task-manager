@@ -1,0 +1,113 @@
+20250301","us…
+Extracted tasks: [
+  {
+    title: 'Sleep In',
+    description: 'Start the day by sleeping in until 1 PM.',
+    startTime: '13:00',
+    duration: 0,
+    priority: 'low'
+  },
+  {
+    title: 'Watch Lecture on LLM Agents',
+    description: 'Watch a lecture on LLM agents for 1.5 hours.',
+    startTime: '13:00',
+    duration: 90,
+    priority: 'high'
+  },
+  {
+    title: 'Call Car Dealership',
+    description: 'Call the dealership to discuss car purchase details.',
+    startTime: '14:30',
+    duration: 15,
+    priority: 'medium'
+  },
+  {
+    title: 'Hifz Preparation',
+    description: 'Prepare for the hifz class by memorizing for one hour.',
+    startTime: '14:45',
+    duration: 60,
+    priority: 'high'
+  },
+  {
+    title: 'Find Items on Marketplace',
+    description: 'Research items to resell on Marketplace.',
+    startTime: '15:45',
+    duration: 60,
+    priority: 'medium'
+  },
+  {
+    title: 'Visit Masjid',
+    description: 'Attend prayers and activities at Masjid (Ramadan)',
+    startTime: '17:00',
+    duration: 210,
+    priority: 'high'
+  },
+  {
+    title: 'Revision Before Hifz Class',
+    description: 'Do a quick revision for hifz class.',
+    startTime: '21:00',
+    duration: 20,
+    priority: 'medium'
+  },
+  {
+    title: 'Hifz Class',
+    description: 'Attend a hifz class for 30 minutes.',
+    startTime: '21:30',
+    duration: 30,
+    priority: 'high'
+  }
+]
+Error extracting tasks: ZodError: [
+  {
+    "code": "too_small",
+    "minimum": 15,
+    "type": "number",
+    "inclusive": true,
+    "exact": false,
+    "message": "Number must be greater than or equal to 15",
+    "path": [
+      "duration"
+    ]
+  }
+]
+    at get error [as error] (file:///home/runner/workspace/node_modules/zod/lib/index.mjs:587:31)
+    at ZodObject.parse (file:///home/runner/workspace/node_modules/zod/lib/index.mjs:692:22)
+    at <anonymous> (/home/runner/workspace/server/openai.ts:57:63)
+    at Array.map (<anonymous>)
+    at extractTasks (/home/runner/workspace/server/openai.ts:57:18)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:149:21) {
+  issues: [
+    {
+      code: 'too_small',
+      minimum: 15,
+      type: 'number',
+      inclusive: true,
+      exact: false,
+      message: 'Number must be greater than or equal to 15',
+      path: [Array]
+    }
+  ],
+  addIssue: [Function (anonymous)],
+  addIssues: [Function (anonymous)],
+  errors: [
+    {
+      code: 'too_small',
+      minimum: 15,
+      type: 'number',
+      inclusive: true,
+      exact: false,
+      message: 'Number must be greater than or equal to 15',
+      path: [Array]
+    }
+  ]
+}
+Task extraction error: Error: Failed to extract tasks from input
+    at extractTasks (/home/runner/workspace/server/openai.ts:60:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:149:21)
+1:08:42 AM [express] POST /api/tasks/extract 500 in 9287ms :: {"error":"Failed to extract tasks"}
+1:09:00 AM [express] GET /api/user 304 in 1ms :: {"authenticated":true,"user":{"id":1,"email":"ibrah…
+1:09:00 AM [express] GET /api/user 304 in 1ms :: {"authenticated":true,"user":{"id":1,"email":"ibrah…
+1:09:00 AM [express] GET /api/tasks 304 in 156ms :: [{"id":"i5g7e3fap95urdioe1lpo9sm30_20250301","us…
+1:09:01 AM [express] GET /api/tasks 304 in 111ms :: [{"id":"i5g7e3fap95urdioe1lpo9sm30_20250301","us…

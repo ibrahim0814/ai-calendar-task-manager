@@ -11,7 +11,7 @@ export async function extractTasks(text: string): Promise<TaskExtract[]> {
       messages: [
         {
           role: "system",
-          content: "Extract tasks from the user's text input. For each task, provide a title, optional description, start time (in HH:mm format), estimated duration in minutes (15-480), and priority level. Follow time-blocking best practices and ensure tasks don't overlap."
+          content: "Extract tasks from the user's text input. For each task, provide a title, optional description, start time (in HH:mm format), estimated duration in minutes (15-480), and priority level. Follow time-blocking best practices and ensure tasks don't overlap. Tasks must have a duration of at least 15 minutes."
         },
         {
           role: "user",
@@ -53,8 +53,10 @@ export async function extractTasks(text: string): Promise<TaskExtract[]> {
     }
 
     const { tasks } = JSON.parse(functionCall.arguments);
-    console.log("Extracted tasks:", tasks); // Add logging
-    return tasks.map((task: TaskExtract) => taskExtractSchema.parse(task));
+    // Filter out tasks with 0 duration
+    const validTasks = tasks.filter((task: TaskExtract) => task.duration > 0);
+    console.log("Extracted tasks:", validTasks);
+    return validTasks.map((task: TaskExtract) => taskExtractSchema.parse(task));
   } catch (error) {
     console.error("Error extracting tasks:", error);
     throw new Error("Failed to extract tasks from input");

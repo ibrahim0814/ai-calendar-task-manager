@@ -21,9 +21,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format, addMinutes, parse } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { Trash2, GripVertical } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 const taskConfirmSchema = z.object({
   tasks: z.array(z.object({
@@ -75,6 +76,32 @@ export function TaskConfirmationDialog({
     form.setValue("tasks", newTasks);
   };
 
+  const onDragEnd = (result: any) => {
+    if (!result.destination) return;
+
+    const tasks = form.getValues("tasks");
+    const [reorderedTask] = tasks.splice(result.source.index, 1);
+    tasks.splice(result.destination.index, 0, reorderedTask);
+
+    // Update start and end times after reordering
+    let currentTime = parse(tasks[0].startTime, "HH:mm", new Date());
+    tasks.forEach((task, index) => {
+      const prevEndTime = index > 0 ? tasks[index - 1].endTime : task.startTime;
+      const startTime = prevEndTime;
+      const taskStartDate = parse(startTime, "HH:mm", new Date());
+      const duration = Math.round((parse(task.endTime, "HH:mm", new Date()).getTime() - parse(task.startTime, "HH:mm", new Date()).getTime()) / (1000 * 60));
+      const endTime = format(addMinutes(taskStartDate, duration), "HH:mm");
+
+      tasks[index] = {
+        ...task,
+        startTime,
+        endTime
+      };
+    });
+
+    form.setValue("tasks", tasks);
+  };
+
   const onSubmit = async (data: TaskConfirmData) => {
     try {
       setIsSubmitting(true);
@@ -101,7 +128,7 @@ export function TaskConfirmationDialog({
       await onConfirm(tasksWithDuration);
     } catch (error) {
       console.error("Failed to schedule tasks:", error);
-      throw error; // Let the parent component handle the error
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
@@ -113,80 +140,101 @@ export function TaskConfirmationDialog({
         <DialogHeader>
           <DialogTitle>Confirm Tasks</DialogTitle>
           <DialogDescription>
-            Review and adjust your tasks before they are scheduled.
+            Review and adjust your tasks before they are scheduled. Drag tasks to reorder them.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-            <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2">
-              {form.watch("tasks").map((task, index) => (
-                <div key={index} className="p-3 border rounded-lg space-y-3 bg-muted/5">
-                  <div className="flex justify-between items-start">
-                    <FormField
-                      control={form.control}
-                      name={`tasks.${index}.title`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1 mr-4">
-                          <FormLabel className="text-sm font-medium">Task {index + 1}</FormLabel>
-                          <FormControl>
-                            <Input {...field} className="text-sm" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => removeTask(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="tasks">
+                {(provided) => (
+                  <div 
+                    {...provided.droppableProps} 
+                    ref={provided.innerRef}
+                    className="max-h-[60vh] overflow-y-auto space-y-3 pr-2"
+                  >
+                    {form.watch("tasks").map((task, index) => (
+                      <Draggable key={index} draggableId={`task-${index}`} index={index}>
+                        {(provided) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className="p-3 border rounded-lg space-y-3 bg-muted/5 cursor-move"
+                          >
+                            <div className="flex justify-between items-start">
+                              
+                              <FormField
+                                control={form.control}
+                                name={`tasks.${index}.title`}
+                                render={({ field }) => (
+                                  <FormItem className="flex-1 mr-4">
+                                    <FormLabel className="text-sm font-medium">Task {index + 1}</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} className="text-sm" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => removeTask(index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField
-                      control={form.control}
-                      name={`tasks.${index}.startTime`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">Start Time</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              className="text-sm"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <div className="grid grid-cols-2 gap-3">
+                              <FormField
+                                control={form.control}
+                                name={`tasks.${index}.startTime`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-sm">Start Time</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="time"
+                                        {...field}
+                                        className="text-sm"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
 
-                    <FormField
-                      control={form.control}
-                      name={`tasks.${index}.endTime`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">End Time</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              className="text-sm"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                              <FormField
+                                control={form.control}
+                                name={`tasks.${index}.endTime`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-sm">End Time</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="time"
+                                        {...field}
+                                        className="text-sm"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
+              </Droppable>
+            </DragDropContext>
 
             <DialogFooter className="gap-2 sm:gap-0">
               <Button type="button" variant="outline" onClick={onClose}>
