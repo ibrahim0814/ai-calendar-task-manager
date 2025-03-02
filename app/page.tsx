@@ -13,7 +13,7 @@ export default function HomePage() {
   return (
     <main className="container mx-auto p-4 min-h-screen">
       <div className="max-w-4xl mx-auto space-y-8">
-        <TaskInput />
+        <TaskInput onTasksCreated={() => {}} />
         <div className="flex justify-end space-x-2">
           <Button
             size="sm"
