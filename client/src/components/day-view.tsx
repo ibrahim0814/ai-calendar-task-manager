@@ -26,7 +26,11 @@ export default function DayView({ tasks }: DayViewProps) {
 
   todaysTasks.sort((a, b) => {
     if (!a.scheduledStart || !b.scheduledStart) return 0;
-    return new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime();
+    const aDate = new Date(a.scheduledStart);
+    const bDate = new Date(b.scheduledStart);
+    const aInPT = new Date(aDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const bInPT = new Date(bDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    return aInPT.getTime() - bInPT.getTime();
   });
 
   return (
