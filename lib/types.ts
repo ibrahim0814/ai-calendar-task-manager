@@ -11,10 +11,34 @@ export const taskExtractSchema = z.object({
 export type TaskExtract = z.infer<typeof taskExtractSchema>
 
 export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime?: string;
+  priority?: "low" | "medium" | "high";
+  category?: string;
+  isAICreated?: boolean;
+}
+
+export interface TaskExtract {
+  title: string;
+  description?: string;
+  startTime: string;
+  duration: number;
+  priority: "low" | "medium" | "high";
+}
+
+export interface User {
   id: string
-  title: string
-  description?: string
-  scheduledStart: string
-  scheduledEnd: string
-  isAICreated?: boolean
+  name?: string
+  email?: string
+  image?: string
+}
+
+export interface AuthState {
+  isAuthenticated: boolean
+  user: User | null
+  accessToken: string | null
+  refreshToken: string | null
 }

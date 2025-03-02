@@ -1,8 +1,10 @@
-import { Task } from "@shared/schema";
+"use client"
+
+import { Task } from "../../lib/types";
 import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
+import { Button } from "./ui/button";
 import { Trash2, Edit2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 interface DayViewProps {
   tasks: Task[];

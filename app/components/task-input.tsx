@@ -1,12 +1,14 @@
+"use client"
+
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/api";
+import { Textarea } from "../components/ui/textarea";
+import { Button } from "../components/ui/button";
+import { useToast } from "../hooks/use-toast";
+import { apiRequest } from "../lib/api";
 import { Loader2 } from "lucide-react";
 import { TaskConfirmationDialog } from "./task-confirmation-dialog";
-import { TaskExtract } from "@shared/schema";
+import { TaskExtract } from "../../lib/types";
 
 interface TaskInputProps {
   onTasksCreated: () => void;

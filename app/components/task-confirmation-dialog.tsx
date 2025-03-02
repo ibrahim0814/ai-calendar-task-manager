@@ -1,4 +1,6 @@
-import { Button } from "@/components/ui/button";
+"use client"
+
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,14 +8,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { TaskExtract } from "@shared/schema";
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { TaskExtract } from "../../lib/types";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 const HOUR_HEIGHT = 60; // pixels per hour
 const MINUTES_PER_HOUR = 60;
@@ -178,7 +180,7 @@ export function TaskConfirmationDialog({
                 {timeMarkers}
 
                 {/* Existing events in gray */}
-                {existingEvents?.map((event: any, index: number) => {
+                {Array.isArray(existingEvents) && existingEvents.map((event: any, index: number) => {
                   if (!event.scheduledStart || !event.scheduledEnd) return null;
                   const start = new Date(event.scheduledStart);
                   const end = new Date(event.scheduledEnd);
