@@ -7,36 +7,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { TaskExtract } from "@shared/schema";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { format, addMinutes, parse } from "date-fns";
-import { Trash2, GripVertical } from "lucide-react";
+import { format, parse, addMinutes } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/api";
 
-const taskConfirmSchema = z.object({
-  tasks: z.array(z.object({
-    title: z.string().min(1, "Title is required"),
-    description: z.string().optional(),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be in HH:mm format"),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be in HH:mm format"),
-    priority: z.enum(["high", "medium", "low"])
-  }))
-});
-
-type TaskConfirmData = z.infer<typeof taskConfirmSchema>;
+const HOUR_HEIGHT = 60; // pixels per hour
+const MINUTES_PER_HOUR = 60;
+const HOURS_IN_DAY = 24;
 
 interface TaskConfirmationDialogProps {
   isOpen: boolean;
@@ -52,207 +32,180 @@ export function TaskConfirmationDialog({
   onConfirm,
 }: TaskConfirmationDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const form = useForm<TaskConfirmData>({
-    resolver: zodResolver(taskConfirmSchema),
-    defaultValues: {
-      tasks: initialTasks.map((task) => {
-        const startTime = task.startTime || format(new Date().setHours(9, 0, 0, 0), "HH:mm");
-        const taskStartDate = parse(startTime, "HH:mm", new Date());
-        const endTime = format(addMinutes(taskStartDate, task.duration), "HH:mm");
+  const [tasks, setTasks] = useState(initialTasks);
 
-        return {
-          ...task,
-          startTime,
-          endTime
-        };
-      }),
-    },
+  // Fetch existing calendar events
+  const { data: existingEvents } = useQuery({
+    queryKey: ['/api/tasks'],
+    enabled: isOpen,
   });
 
-  const removeTask = (index: number) => {
-    const currentTasks = form.getValues("tasks");
-    const newTasks = [...currentTasks];
-    newTasks.splice(index, 1);
-    form.setValue("tasks", newTasks);
+  // Convert minutes since start of day to pixels
+  const minutesToPixels = (minutes: number) => {
+    return (minutes / MINUTES_PER_HOUR) * HOUR_HEIGHT;
   };
 
-  const onDragEnd = (result: any) => {
-    if (!result.destination) return;
-
-    const tasks = form.getValues("tasks");
-    const [reorderedTask] = tasks.splice(result.source.index, 1);
-    tasks.splice(result.destination.index, 0, reorderedTask);
-
-    // Update start and end times after reordering
-    let currentTime = parse(tasks[0].startTime, "HH:mm", new Date());
-    tasks.forEach((task, index) => {
-      const prevEndTime = index > 0 ? tasks[index - 1].endTime : task.startTime;
-      const startTime = prevEndTime;
-      const taskStartDate = parse(startTime, "HH:mm", new Date());
-      const duration = Math.round((parse(task.endTime, "HH:mm", new Date()).getTime() - parse(task.startTime, "HH:mm", new Date()).getTime()) / (1000 * 60));
-      const endTime = format(addMinutes(taskStartDate, duration), "HH:mm");
-
-      tasks[index] = {
-        ...task,
-        startTime,
-        endTime
-      };
-    });
-
-    form.setValue("tasks", tasks);
+  // Convert pixels to minutes since start of day
+  const pixelsToMinutes = (pixels: number) => {
+    return Math.round((pixels / HOUR_HEIGHT) * MINUTES_PER_HOUR);
   };
 
-  const onSubmit = async (data: TaskConfirmData) => {
+  // Convert time string to minutes since start of day
+  const timeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    return hours * MINUTES_PER_HOUR + minutes;
+  };
+
+  // Convert minutes since start of day to time string
+  const minutesToTime = (minutes: number) => {
+    const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+    const mins = minutes % MINUTES_PER_HOUR;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  };
+
+  const handleDragStart = (e: React.DragEvent, taskIndex: number) => {
+    e.dataTransfer.setData('text/plain', String(taskIndex));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    const timelineRect = e.currentTarget.getBoundingClientRect();
+    const minutes = pixelsToMinutes(e.clientY - timelineRect.top);
+    // Optional: show a preview line at the current drag position
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const taskIndex = Number(e.dataTransfer.getData('text/plain'));
+    const timelineRect = e.currentTarget.getBoundingClientRect();
+    const dropMinutes = pixelsToMinutes(e.clientY - timelineRect.top);
+
+    const updatedTasks = [...tasks];
+    const task = updatedTasks[taskIndex];
+    const taskStartMinutes = timeToMinutes(task.startTime);
+    const minutesDiff = dropMinutes - taskStartMinutes;
+
+    const newStartTime = minutesToTime(dropMinutes);
+    const newEndTime = minutesToTime(dropMinutes + task.duration);
+
+    updatedTasks[taskIndex] = {
+      ...task,
+      startTime: newStartTime
+    };
+
+    setTasks(updatedTasks);
+  };
+
+  const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
-      // Convert endTime back to duration for API compatibility
-      const tasksWithDuration = data.tasks.map(task => {
-        const startDate = parse(task.startTime, "HH:mm", new Date());
-        const endDate = parse(task.endTime, "HH:mm", new Date());
-        const durationInMinutes = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60));
-
-        // Ensure duration is positive
-        if (durationInMinutes <= 0) {
-          throw new Error(`Invalid duration for task "${task.title}": end time must be after start time`);
-        }
-
-        return {
-          title: task.title,
-          description: task.description || "",
-          startTime: task.startTime,
-          duration: durationInMinutes,
-          priority: task.priority
-        };
-      });
-
-      await onConfirm(tasksWithDuration);
-    } catch (error) {
-      console.error("Failed to schedule tasks:", error);
-      throw error;
+      await onConfirm(tasks);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Generate hour markers
+  const hourMarkers = Array.from({ length: HOURS_IN_DAY }, (_, i) => {
+    const hour = i;
+    const isAM = hour < 12;
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return (
+      <div
+        key={hour}
+        className="absolute w-full border-t border-border"
+        style={{ top: `${hour * HOUR_HEIGHT}px` }}
+      >
+        <span className="text-xs text-muted-foreground -mt-2 inline-block">
+          {displayHour} {isAM ? 'AM' : 'PM'}
+        </span>
+      </div>
+    );
+  });
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Confirm Tasks</DialogTitle>
           <DialogDescription>
-            Review and adjust your tasks before they are scheduled. Drag tasks to reorder them.
+            Drag tasks to adjust their timing. Gray blocks show existing events.
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-            <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="tasks">
-                {(provided) => (
-                  <div 
-                    {...provided.droppableProps} 
-                    ref={provided.innerRef}
-                    className="max-h-[60vh] overflow-y-auto space-y-3 pr-2"
-                  >
-                    {form.watch("tasks").map((task, index) => (
-                      <Draggable key={index} draggableId={`task-${index}`} index={index}>
-                        {(provided) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className="p-3 border rounded-lg space-y-3 bg-muted/5 cursor-move"
-                          >
-                            <div className="flex justify-between items-start">
-                              
-                              <FormField
-                                control={form.control}
-                                name={`tasks.${index}.title`}
-                                render={({ field }) => (
-                                  <FormItem className="flex-1 mr-4">
-                                    <FormLabel className="text-sm font-medium">Task {index + 1}</FormLabel>
-                                    <FormControl>
-                                      <Input {...field} className="text-sm" />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => removeTask(index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+        <div className="relative h-[600px] overflow-y-auto mt-4">
+          <div 
+            className="absolute inset-0"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
+            {hourMarkers}
 
-                            <div className="grid grid-cols-2 gap-3">
-                              <FormField
-                                control={form.control}
-                                name={`tasks.${index}.startTime`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm">Start Time</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="time"
-                                        {...field}
-                                        className="text-sm"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+            {/* Existing events in gray */}
+            {existingEvents?.map((event: any, index: number) => {
+              if (!event.scheduledStart || !event.scheduledEnd) return null;
+              const start = new Date(event.scheduledStart);
+              const end = new Date(event.scheduledEnd);
+              const startMinutes = start.getHours() * 60 + start.getMinutes();
+              const duration = (end.getTime() - start.getTime()) / (1000 * 60);
 
-                              <FormField
-                                control={form.control}
-                                name={`tasks.${index}.endTime`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm">End Time</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="time"
-                                        {...field}
-                                        className="text-sm"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
+              return (
+                <div
+                  key={`existing-${index}`}
+                  className="absolute left-0 right-0 bg-muted/50 rounded"
+                  style={{
+                    top: `${minutesToPixels(startMinutes)}px`,
+                    height: `${minutesToPixels(duration)}px`,
+                  }}
+                >
+                  <div className="p-2 text-xs text-muted-foreground">
+                    {event.title}
                   </div>
-                )}
-              </Droppable>
-            </DragDropContext>
+                </div>
+              );
+            })}
 
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Scheduling...
-                  </>
-                ) : (
-                  'Schedule Tasks'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+            {/* New tasks being scheduled */}
+            {tasks.map((task, index) => {
+              const startMinutes = timeToMinutes(task.startTime);
+              return (
+                <div
+                  key={`task-${index}`}
+                  className="absolute left-0 right-0 bg-primary/20 border border-primary/50 rounded cursor-move"
+                  style={{
+                    top: `${minutesToPixels(startMinutes)}px`,
+                    height: `${minutesToPixels(task.duration)}px`,
+                  }}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                >
+                  <div className="p-2 text-xs">
+                    <div className="font-medium">{task.title}</div>
+                    <div className="text-muted-foreground">
+                      {task.startTime} - {minutesToTime(startMinutes + task.duration)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Scheduling...
+              </>
+            ) : (
+              'Schedule Tasks'
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
