@@ -1,69 +1,109 @@
 "use client"
 
 import { useState } from "react"
+import { useMutation } from "@tanstack/react-query"
+import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { TaskConfirmationDialog } from "./task-confirmation-dialog"
+import { TaskExtract } from "@/lib/types"
 
-export function TaskInput() {
-  const [input, setInput] = useState("")
+interface TaskInputProps {
+  onTasksCreated: () => void
+}
+
+export default function TaskInput({ onTasksCreated }: TaskInputProps) {
+  const [text, setText] = useState("")
+  const [extractedTasks, setExtractedTasks] = useState<TaskExtract[]>([])
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const { toast } = useToast()
-  const queryClient = useQueryClient()
 
-  const { mutate: createTask, isPending } = useMutation({
+  const extractMutation = useMutation({
     mutationFn: async (text: string) => {
-      const response = await fetch("/api/tasks", {
+      const res = await fetch("/api/tasks/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text })
       })
-      if (!response.ok) throw new Error("Failed to create task")
-      return response.json()
+      if (!res.ok) {
+        throw new Error("Failed to extract tasks")
+      }
+      return res.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] })
-      setInput("")
-      toast({
-        title: "Task created",
-        description: "Your task has been scheduled successfully.",
-      })
+    onSuccess: (tasks: TaskExtract[]) => {
+      setExtractedTasks(tasks)
+      setShowConfirmation(true)
     },
     onError: (error) => {
+      console.error("Task extraction error:", error)
       toast({
         title: "Error",
-        description: "Failed to create task. Please try again.",
+        description: "Failed to extract tasks from your input",
         variant: "destructive",
       })
     },
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim()) return
-    createTask(input)
-  }
+  const createMutation = useMutation({
+    mutationFn: async (tasks: TaskExtract[]) => {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tasks })
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.message || "Failed to process tasks")
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      setText("")
+      setShowConfirmation(false)
+      onTasksCreated()
+      toast({
+        title: "Success",
+        description: "Your tasks have been scheduled successfully",
+      })
+    },
+    onError: (error) => {
+      console.error("Task creation error:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create tasks",
+        variant: "destructive",
+      })
+    },
+  })
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
-      <Input
-        placeholder="Enter your task in natural language (e.g. 'Meeting with John at 2pm for 1 hour')"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        disabled={isPending}
-        className="flex-1"
+    <div className="space-y-4">
+      <Textarea
+        placeholder="Describe your tasks for the day..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        className="min-h-[100px]"
       />
-      <Button type="submit" disabled={isPending || !input.trim()}>
-        {isPending ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Scheduling...
-          </>
-        ) : (
-          "Schedule"
-        )}
+      <Button
+        onClick={() => extractMutation.mutate(text)}
+        disabled={extractMutation.isPending || !text.trim()}
+        className="w-full"
+      >
+        {extractMutation.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        ) : null}
+        Process Tasks
       </Button>
-    </form>
+
+      {extractedTasks.length > 0 && (
+        <TaskConfirmationDialog
+          isOpen={showConfirmation}
+          onClose={() => setShowConfirmation(false)}
+          tasks={extractedTasks}
+          onConfirm={(tasks) => createMutation.mutate(tasks)}
+        />
+      )}
+    </div>
   )
 }
