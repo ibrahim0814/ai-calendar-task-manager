@@ -39,6 +39,17 @@ interface TaskConfirmationDialogProps {
 
 type ViewMode = 'calendar' | 'list';
 
+// Form schema for list view
+const formSchema = z.object({
+  tasks: z.array(z.object({
+    title: z.string(),
+    startTime: z.string(),
+    duration: z.number(),
+    description: z.string().optional(),
+    priority: z.string()
+  }))
+});
+
 export function TaskConfirmationDialog({
   isOpen,
   onClose,
@@ -48,6 +59,16 @@ export function TaskConfirmationDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [tasks, setTasks] = useState(initialTasks);
+
+  const form = useForm({
+    defaultValues: {
+      tasks: initialTasks.map(task => ({
+        ...task,
+        startTime: task.startTime,
+        duration: task.duration,
+      }))
+    }
+  });
 
   // Fetch existing calendar events
   const { data: existingEvents } = useQuery({
@@ -113,14 +134,6 @@ export function TaskConfirmationDialog({
     setTasks(updatedTasks);
   };
 
-  const listForm = useForm({
-    defaultValues: {
-      tasks: tasks.map(task => ({
-        ...task,
-      }))
-    }
-  });
-
   // Generate markers for hours and half hours
   const timeMarkers = Array.from({ length: HOURS_IN_DAY * 2 }, (_, i) => {
     const minutes = i * 30;
@@ -146,6 +159,17 @@ export function TaskConfirmationDialog({
       </div>
     );
   });
+
+  const onSubmit = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      await onConfirm(viewMode === 'calendar' ? tasks : data.tasks);
+    } catch (error) {
+      console.error("Failed to schedule tasks:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -178,7 +202,7 @@ export function TaskConfirmationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 max-h-[calc(80vh-8rem)] overflow-y-auto">
+        <div className="flex-1 min-h-[500px] max-h-[calc(80vh-12rem)] overflow-y-auto pr-2">
           {viewMode === 'calendar' ? (
             <div className="relative h-[720px]">
               <div 
@@ -247,12 +271,12 @@ export function TaskConfirmationDialog({
               </div>
             </div>
           ) : (
-            <Form {...listForm}>
-              <form className="space-y-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 {tasks.map((task, index) => (
                   <div key={index} className="p-4 border rounded-lg space-y-3">
                     <FormField
-                      control={listForm.control}
+                      control={form.control}
                       name={`tasks.${index}.title`}
                       render={({ field }) => (
                         <FormItem>
@@ -266,20 +290,24 @@ export function TaskConfirmationDialog({
                     />
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
-                        control={listForm.control}
+                        control={form.control}
                         name={`tasks.${index}.startTime`}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Start Time</FormLabel>
                             <FormControl>
-                              <Input type="time" step="900" {...field} />
+                              <Input 
+                                type="time" 
+                                step="900"
+                                {...field}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                       <FormField
-                        control={listForm.control}
+                        control={form.control}
                         name={`tasks.${index}.duration`}
                         render={({ field }) => (
                           <FormItem>
@@ -290,7 +318,7 @@ export function TaskConfirmationDialog({
                                 min="15" 
                                 max="480" 
                                 step="15" 
-                                {...field} 
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
@@ -309,7 +337,10 @@ export function TaskConfirmationDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={() => onConfirm(tasks)} disabled={isSubmitting}>
+          <Button 
+            onClick={viewMode === 'list' ? form.handleSubmit(onSubmit) : () => onSubmit({ tasks })} 
+            disabled={isSubmitting}
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
