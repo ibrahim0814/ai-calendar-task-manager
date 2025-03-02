@@ -116,12 +116,13 @@ export function TaskConfirmationDialog({
         key={minutes}
         className={cn(
           "absolute w-full border-t",
-          isHour ? "border-border" : "border-border/30"
+          isHour ? "border-border" : "border-border/30",
+          "dark:border-gray-700 dark:border-opacity-50"
         )}
         style={{ top: `${minutesToPixels(minutes)}px` }}
       >
         {isHour && (
-          <span className="absolute -mt-3 -ml-12 w-10 text-right text-xs text-muted-foreground">
+          <span className="absolute -mt-3 -ml-12 w-10 text-right text-xs text-muted-foreground dark:text-gray-400">
             {displayHour} {isAM ? 'AM' : 'PM'}
           </span>
         )}
@@ -170,7 +171,7 @@ export function TaskConfirmationDialog({
           {viewMode === 'calendar' ? (
             <div className="relative h-[720px]">
               <div
-                className="absolute inset-0 ml-14"
+                className="absolute inset-0 ml-14 bg-background dark:bg-gray-900"
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
               >
@@ -187,7 +188,7 @@ export function TaskConfirmationDialog({
                   return (
                     <div
                       key={`existing-${index}`}
-                      className="absolute left-0 right-4 bg-muted/30 hover:bg-muted/40 border border-border/50 rounded-md shadow-sm"
+                      className="absolute left-0 right-4 bg-muted/30 dark:bg-gray-800/50 hover:bg-muted/40 dark:hover:bg-gray-800/70 border border-border/50 dark:border-gray-700 rounded-md shadow-sm"
                       style={{
                         top: `${minutesToPixels(startMinutes)}px`,
                         height: `${minutesToPixels(duration)}px`,
@@ -195,10 +196,10 @@ export function TaskConfirmationDialog({
                       }}
                     >
                       <div className="p-2">
-                        <div className="font-medium text-sm text-muted-foreground truncate">
+                        <div className="font-medium text-sm text-muted-foreground dark:text-gray-300 truncate">
                           {event.title}
                         </div>
-                        <div className="text-xs text-muted-foreground/80">
+                        <div className="text-xs text-muted-foreground/80 dark:text-gray-400">
                           {format(start, "h:mm a")} - {format(end, "h:mm a")}
                         </div>
                       </div>
@@ -212,7 +213,7 @@ export function TaskConfirmationDialog({
                   return (
                     <div
                       key={`task-${index}`}
-                      className="absolute left-0 right-4 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded-md shadow-sm cursor-move"
+                      className="absolute left-0 right-4 bg-blue-500/20 dark:bg-blue-500/30 hover:bg-blue-500/30 dark:hover:bg-blue-500/40 border border-blue-500/50 dark:border-blue-400/50 rounded-md shadow-sm cursor-move"
                       style={{
                         top: `${minutesToPixels(startMinutes)}px`,
                         height: `${minutesToPixels(task.duration)}px`,
@@ -222,10 +223,10 @@ export function TaskConfirmationDialog({
                       onDragStart={(e) => handleDragStart(e, index)}
                     >
                       <div className="p-2">
-                        <div className="font-medium text-sm truncate">
+                        <div className="font-medium text-sm truncate dark:text-gray-200">
                           {task.title}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground dark:text-gray-400">
                           {formatTime(task.startTime)} - {formatTime(minutesToTime(startMinutes + task.duration))}
                         </div>
                       </div>
@@ -237,9 +238,9 @@ export function TaskConfirmationDialog({
           ) : (
             <div className="space-y-4">
               {tasks.map((task, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-3">
+                <div key={index} className="p-4 border rounded-lg space-y-3 dark:border-gray-700 dark:bg-gray-800/50">
                   <div>
-                    <label className="text-sm font-medium">Title</label>
+                    <label className="text-sm font-medium dark:text-gray-200">Title</label>
                     <Input
                       value={task.title}
                       onChange={(e) => {
@@ -247,11 +248,12 @@ export function TaskConfirmationDialog({
                         updatedTasks[index] = { ...task, title: e.target.value };
                         setTasks(updatedTasks);
                       }}
+                      className="dark:bg-gray-900 dark:border-gray-700"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium">Start Time</label>
+                      <label className="text-sm font-medium dark:text-gray-200">Start Time</label>
                       <Input
                         type="time"
                         step="900"
@@ -261,10 +263,11 @@ export function TaskConfirmationDialog({
                           updatedTasks[index] = { ...task, startTime: e.target.value };
                           setTasks(updatedTasks);
                         }}
+                        className="dark:bg-gray-900 dark:border-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Duration (minutes)</label>
+                      <label className="text-sm font-medium dark:text-gray-200">Duration (minutes)</label>
                       <Input
                         type="number"
                         min="15"
@@ -276,6 +279,7 @@ export function TaskConfirmationDialog({
                           updatedTasks[index] = { ...task, duration: Number(e.target.value) };
                           setTasks(updatedTasks);
                         }}
+                        className="dark:bg-gray-900 dark:border-gray-700"
                       />
                     </div>
                   </div>
