@@ -4,16 +4,24 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.googleusercontent.com",
       },
     ],
   },
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000', '192.168.12.41:3000'],
+      allowedOrigins: ["localhost:3000", "192.168.12.41:3000"],
     },
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

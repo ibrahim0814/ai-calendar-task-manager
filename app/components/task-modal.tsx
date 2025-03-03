@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,39 +8,54 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog"
-import { Button } from "./ui/button"
-import { Input } from "./ui/input"
-import { Label } from "./ui/label"
-import { Textarea } from "./ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
-import { addHours } from "date-fns"
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 interface Task {
-  id: string
-  title: string
-  description?: string
-  startTime: string
-  endTime?: string
-  priority?: "low" | "medium" | "high"
+  id: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime?: string;
+  priority?: "low" | "medium" | "high";
 }
 
 interface TaskModalProps {
-  onClose: () => void
-  onCreateTask: (task: Omit<Task, 'id'>) => Promise<void>
-  taskToEdit?: Task | null
+  onClose: () => void;
+  onCreateTask: (task: Omit<Task, "id">) => Promise<void>;
+  taskToEdit?: Task | null;
 }
 
-export default function TaskModal({ onClose, onCreateTask, taskToEdit }: TaskModalProps) {
-  const [title, setTitle] = useState(taskToEdit?.title || "")
-  const [description, setDescription] = useState(taskToEdit?.description || "")
-  const [startTime, setStartTime] = useState("")
-  const [endTime, setEndTime] = useState("")
-  const [priority, setPriority] = useState<"low" | "medium" | "high">(taskToEdit?.priority || "medium")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState("")
+export default function TaskModal({
+  onClose,
+  onCreateTask,
+  taskToEdit,
+}: TaskModalProps) {
+  const [title, setTitle] = useState(taskToEdit?.title || "");
+  const [description, setDescription] = useState(taskToEdit?.description || "");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">(
+    taskToEdit?.priority || "medium"
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  // Memoize the taskToEdit id to avoid unnecessary effect triggering
+  const taskToEditId = useMemo(() => taskToEdit?.id, [taskToEdit?.id]);
 
   useEffect(() => {
+    // Only run this effect when taskToEditId changes
     if (taskToEdit) {
       // When editing a task, properly format the date-time values
       try {
@@ -68,58 +83,92 @@ export default function TaskModal({ onClose, onCreateTask, taskToEdit }: TaskMod
       now.setSeconds(0);
       now.setMilliseconds(0);
       setStartTime(now.toISOString().slice(0, 16));
-      
+
       // Set default end time to one hour later
       const oneHourLater = new Date(now);
       oneHourLater.setHours(now.getHours() + 1);
       setEndTime(oneHourLater.toISOString().slice(0, 16));
     }
-  }, [taskToEdit]);
+  }, [taskToEditId, startTime]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!title.trim()) {
-      setError("Title is required")
-      return
-    }
-    
-    if (!startTime || !endTime) {
-      setError("Start and end times are required")
-      return
-    }
-    
-    setIsSubmitting(true)
-    setError("")
-    
-    try {
-      await onCreateTask({
-        title,
-        description,
-        startTime: new Date(startTime).toISOString(),
-        endTime: new Date(endTime).toISOString(),
-        priority,
-        ...(taskToEdit ? { id: taskToEdit.id } : {})
-      })
-      onClose()
-    } catch (err) {
-      console.error("Error creating task:", err)
-      setError("Failed to create task. Please try again.")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  // Memoize the submit handler to prevent recreating it on each render
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      console.log("Task form submitted");
+
+      if (!title.trim()) {
+        setError("Title is required");
+        return;
+      }
+
+      if (!startTime || !endTime) {
+        setError("Start and end times are required");
+        return;
+      }
+
+      console.log("Setting isSubmitting to true");
+      setIsSubmitting(true);
+      setError("");
+
+      try {
+        console.log("Calling onCreateTask with form data");
+        const taskData = {
+          title,
+          description,
+          startTime: new Date(startTime).toISOString(),
+          endTime: new Date(endTime).toISOString(),
+          priority,
+          ...(taskToEdit ? { id: taskToEdit.id } : {}),
+        };
+        
+        console.log("Task data being sent:", JSON.stringify(taskData));
+        await onCreateTask(taskData);
+        
+        console.log("onCreateTask completed successfully, closing modal");
+        // Use a small delay before closing the modal to allow state updates to propagate
+        setTimeout(() => {
+          onClose();
+        }, 50);
+      } catch (err) {
+        console.error("Error creating task:", err);
+        setError("Failed to create task. Please try again.");
+        setIsSubmitting(false);
+      }
+      // Note: We don't set isSubmitting to false here if successful,
+      // as the component will unmount when onClose() is called
+    },
+    [
+      title,
+      description,
+      startTime,
+      endTime,
+      priority,
+      taskToEdit,
+      onCreateTask,
+      onClose,
+    ]
+  );
+
+  // Memoize component state to avoid unnecessary rerenders
+  const dialogState = useMemo(
+    () => ({
+      isEditing: !!taskToEdit,
+      title: taskToEdit ? "Edit Task" : "Create New Task",
+      description: taskToEdit
+        ? "Update your task details below."
+        : "Add a new task to your schedule.",
+      buttonText: taskToEdit ? "Update" : "Create",
+    }),
+    [taskToEdit]
+  );
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[600px] w-[95vw]">
         <DialogHeader>
-          <DialogTitle>{taskToEdit ? "Edit Task" : "Create New Task"}</DialogTitle>
-          <DialogDescription>
-            {taskToEdit 
-              ? "Update your task details below." 
-              : "Add a new task to your schedule."}
-          </DialogDescription>
+          <DialogTitle>{dialogState.title}</DialogTitle>
+          <DialogDescription>{dialogState.description}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -169,7 +218,9 @@ export default function TaskModal({ onClose, onCreateTask, taskToEdit }: TaskMod
             <Label htmlFor="priority">Priority</Label>
             <Select
               value={priority}
-              onValueChange={setPriority}
+              onValueChange={(value) =>
+                setPriority(value as "high" | "medium" | "low")
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select priority" />
@@ -183,7 +234,9 @@ export default function TaskModal({ onClose, onCreateTask, taskToEdit }: TaskMod
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <div className="flex items-center">
@@ -191,11 +244,11 @@ export default function TaskModal({ onClose, onCreateTask, taskToEdit }: TaskMod
                 Processing...
               </div>
             ) : (
-              taskToEdit ? "Update" : "Create"
+              dialogState.buttonText
             )}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
