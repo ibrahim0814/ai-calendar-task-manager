@@ -20,6 +20,9 @@ export interface Task {
   category?: string;
   isAICreated?: boolean;
   googleEventId?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  date?: string;
 }
 
 export interface User {
