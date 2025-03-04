@@ -35,7 +35,7 @@ export const authOptions: NextAuthOptions = {
         params: {
           scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
           access_type: "offline",
-          prompt: "consent",
+          // Remove "prompt: consent" to avoid forcing consent screen every time
         },
       },
     }),

@@ -20,9 +20,15 @@ import {
   Columns,
   ListTodo,
 } from "lucide-react";
-import { TaskExtract } from "../../lib/types";
+import { TaskExtract, Task } from "../../lib/types";
 import { Badge } from "./ui/badge";
-import { formatTime, formatDuration, getTodayDateString, getTomorrowDateString, formatShortDate } from "../utils/date-utils";
+import {
+  formatTime,
+  formatDuration,
+  getTodayDateString,
+  getTomorrowDateString,
+  formatShortDate,
+} from "../utils/date-utils";
 import { isSameDay, addDays } from "date-fns";
 import { Input } from "./ui/input";
 import {
@@ -37,16 +43,20 @@ import { Calendar as CalendarComponent } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Label } from "./ui/label";
 import TaskDayView from "./task-day-view";
+import { useIsMobile } from "../hooks/use-mobile";
 
 interface NaturalLanguageModalProps {
   onClose: () => void;
   onCreateTasks: (tasks: TaskExtract[]) => Promise<void>;
+  taskToEdit?: Task | null;
 }
 
 export default function NaturalLanguageModal({
   onClose,
   onCreateTasks,
+  taskToEdit,
 }: NaturalLanguageModalProps) {
+  const isMobile = useIsMobile();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -99,7 +109,34 @@ export default function NaturalLanguageModal({
           throw new Error("No tasks could be extracted from your text");
         }
 
-        setExtractedTasks(tasks);
+        // If tasks have a date, set the selectedDate to the first task's date
+        if (tasks.length > 0 && tasks[0].date) {
+          // Make sure we're using an actual Date object
+          const taskDate =
+            tasks[0].date instanceof Date
+              ? tasks[0].date
+              : new Date(tasks[0].date);
+          console.log(
+            "Setting selected date from extracted task:",
+            taskDate.toISOString()
+          );
+          setSelectedDate(taskDate);
+        }
+
+        // Ensure all tasks have proper Date objects for their dates
+        const processedTasks = tasks.map((task) => ({
+          ...task,
+          date: task.date instanceof Date ? task.date : undefined,
+        }));
+
+        console.log(
+          "Processed tasks with date objects:",
+          JSON.stringify(processedTasks, (key, value) =>
+            key === "date" && value ? value.toISOString() : value
+          )
+        );
+
+        setExtractedTasks(processedTasks);
         setProcessingStep("confirmation");
       } catch (err) {
         console.error("Error extracting tasks:", err);
@@ -126,13 +163,13 @@ export default function NaturalLanguageModal({
       console.log("Calling onCreateTasks function");
       await onCreateTasks(extractedTasks);
       console.log("Tasks successfully added to calendar, closing modal");
-      onClose();
     } catch (error) {
       console.error("Error adding tasks to calendar:", error);
       setError("Failed to add tasks to calendar");
     } finally {
       console.log("Setting isAddingToCalendar to false");
       setIsAddingToCalendar(false);
+      onClose();
     }
   }, [extractedTasks, onClose, onCreateTasks]);
 
@@ -238,7 +275,11 @@ export default function NaturalLanguageModal({
 
   // Task list rendering
   const renderTaskList = () => (
-    <div className="space-y-4 max-h-[60vh] sm:max-h-[400px] overflow-y-auto mb-4">
+    <div
+      className={`space-y-4 ${
+        isMobile ? "max-h-[50vh]" : "max-h-[60vh] sm:max-h-[400px]"
+      } overflow-y-auto mb-4`}
+    >
       {extractedTasks.map((task, index) => (
         <div
           key={index}
@@ -249,14 +290,14 @@ export default function NaturalLanguageModal({
               <div className="w-full">
                 <Input
                   value={task.title}
-                  onChange={(e) => updateTaskField(index, "title", e.target.value)}
+                  onChange={(e) =>
+                    updateTaskField(index, "title", e.target.value)
+                  }
                   className="mb-2 bg-slate-800 border-slate-700 text-white"
                 />
               </div>
             ) : (
-              <h3 className="font-medium text-lg text-white">
-                {task.title}
-              </h3>
+              <h3 className="font-medium text-lg text-white">{task.title}</h3>
             )}
 
             {editingTaskIndex === index ? (
@@ -264,9 +305,7 @@ export default function NaturalLanguageModal({
                 {priorityOptions.map((option) => (
                   <Badge
                     key={option.value}
-                    className={`${
-                      option.color
-                    } cursor-pointer transition-all ${
+                    className={`${option.color} cursor-pointer transition-all ${
                       task.priority === option.value
                         ? "scale-110 border border-white"
                         : "opacity-70"
@@ -281,9 +320,7 @@ export default function NaturalLanguageModal({
               </div>
             ) : (
               <Badge
-                className={`${getPriorityColor(
-                  task.priority
-                )} cursor-pointer`}
+                className={`${getPriorityColor(task.priority)} cursor-pointer`}
                 onClick={() => setEditingTaskIndex(index)}
               >
                 {task.priority.toLowerCase()}
@@ -294,14 +331,14 @@ export default function NaturalLanguageModal({
           {editingTaskIndex === index ? (
             <Textarea
               value={task.description || ""}
-              onChange={(e) => updateTaskField(index, "description", e.target.value)}
+              onChange={(e) =>
+                updateTaskField(index, "description", e.target.value)
+              }
               placeholder="Add a description (optional)"
               className="mb-2 bg-slate-800 border-slate-700 text-white text-sm resize-none h-20"
             />
           ) : task.description ? (
-            <p className="text-slate-300 mb-2 text-sm">
-              {task.description}
-            </p>
+            <p className="text-slate-300 mb-2 text-sm">{task.description}</p>
           ) : null}
 
           <div className="flex items-center text-sm text-slate-300 gap-3">
@@ -318,18 +355,21 @@ export default function NaturalLanguageModal({
                         className="w-[140px] h-8 bg-slate-700 border-slate-600 text-white text-sm"
                       />
                     </div>
-                    
+
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           className="h-7 bg-slate-700 border-slate-600 text-white text-xs w-[140px] flex justify-between items-center"
                         >
                           <Calendar className="h-3 w-3 mr-1" />
                           <span>
-                            {task.date ? formatShortDate(task.date) : 
-                              (selectedDate ? formatShortDate(selectedDate) : 'Today')}
+                            {task.date
+                              ? formatShortDate(task.date)
+                              : selectedDate
+                              ? formatShortDate(selectedDate)
+                              : "Today"}
                           </span>
                         </Button>
                       </PopoverTrigger>
@@ -337,7 +377,9 @@ export default function NaturalLanguageModal({
                         <CalendarComponent
                           mode="single"
                           selected={task.date || selectedDate || undefined}
-                          onSelect={(date) => date && updateTaskField(index, "date", date)}
+                          onSelect={(date) =>
+                            date && updateTaskField(index, "date", date)
+                          }
                           initialFocus
                         />
                       </PopoverContent>
@@ -348,32 +390,23 @@ export default function NaturalLanguageModal({
                     <Select
                       value={task.duration.toString()}
                       onValueChange={(value) =>
-                        updateTaskField(
-                          index,
-                          "duration",
-                          parseInt(value)
-                        )
+                        updateTaskField(index, "duration", parseInt(value))
                       }
                     >
                       <SelectTrigger className="h-8 w-[100px] bg-slate-700 border-slate-600 text-white text-sm">
                         <SelectValue placeholder="Duration" />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-700">
-                        {[15, 30, 45, 60, 90, 120, 180, 240].map(
-                          (mins) => (
-                            <SelectItem
-                              key={mins}
-                              value={mins.toString()}
-                            >
-                              {mins} min
-                              {mins > 60
-                                ? ` (${Math.floor(mins / 60)}h${
-                                    mins % 60 ? ` ${mins % 60}m` : ""
-                                  })`
-                                : ""}
-                            </SelectItem>
-                          )
-                        )}
+                        {[15, 30, 45, 60, 90, 120, 180, 240].map((mins) => (
+                          <SelectItem key={mins} value={mins.toString()}>
+                            {mins} min
+                            {mins > 60
+                              ? ` (${Math.floor(mins / 60)}h${
+                                  mins % 60 ? ` ${mins % 60}m` : ""
+                                })`
+                              : ""}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -430,17 +463,164 @@ export default function NaturalLanguageModal({
 
   // Function to update the date for all tasks
   const updateAllTaskDates = useCallback((date: Date) => {
+    if (!date) {
+      console.warn("Attempted to update tasks with a null or undefined date");
+      return;
+    }
+
+    // Create a clean date object without time component
+    const cleanDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
     setExtractedTasks((prevTasks) => {
-      return prevTasks.map(task => ({
+      return prevTasks.map((task) => ({
         ...task,
-        date: date
+        date: cleanDate,
       }));
     });
-    setSelectedDate(date);
+
+    setSelectedDate(cleanDate);
+    console.log("Updated all tasks to date:", cleanDate.toISOString());
   }, []);
 
-  // Confirmation step rendering
-  const renderConfirmationStep = () => (
+  // Mobile-specific confirmation step
+  const renderMobileConfirmationStep = () => (
+    <div className="py-2 flex flex-col">
+      {/* Mobile date selector */}
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="text-sm font-medium mb-1">Schedule tasks for:</div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={
+              selectedDate && isSameDay(selectedDate, new Date())
+                ? "default"
+                : "outline"
+            }
+            size="sm"
+            onClick={() => updateAllTaskDates(new Date())}
+            className="text-xs h-9 w-full"
+          >
+            Today ({getTodayDateString()})
+          </Button>
+          <Button
+            variant={
+              selectedDate && isSameDay(selectedDate, addDays(new Date(), 1))
+                ? "default"
+                : "outline"
+            }
+            size="sm"
+            onClick={() => updateAllTaskDates(addDays(new Date(), 1))}
+            className="text-xs h-9 w-full"
+          >
+            Tomorrow ({getTomorrowDateString()})
+          </Button>
+        </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-9 flex items-center justify-center gap-1 w-full mt-1"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              {selectedDate &&
+              !isSameDay(selectedDate, new Date()) &&
+              !isSameDay(selectedDate, addDays(new Date(), 1))
+                ? formatShortDate(selectedDate)
+                : "Custom Date"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="center">
+            <CalendarComponent
+              mode="single"
+              selected={selectedDate || undefined}
+              onSelect={(date) => date && updateAllTaskDates(date)}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* Mobile view toggle */}
+      <div className="mb-3 w-full">
+        <div className="grid grid-cols-2 gap-1 bg-slate-800 rounded-lg p-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 py-1 ${viewMode === "list" ? "bg-slate-700" : ""}`}
+            onClick={() => setViewMode("list")}
+          >
+            <ListTodo className="h-4 w-4 mr-2" />
+            List View
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 py-1 ${
+              viewMode === "calendar" ? "bg-slate-700" : ""
+            }`}
+            onClick={() => setViewMode("calendar")}
+          >
+            <Columns className="h-4 w-4 mr-2" />
+            Calendar View
+          </Button>
+        </div>
+      </div>
+
+      {/* Task display - calendar or list */}
+      <div className="flex-1 overflow-y-auto max-h-[40vh]">
+        {viewMode === "calendar" ? (
+          <TaskDayView
+            tasks={extractedTasks}
+            updateTaskField={updateTaskField}
+          />
+        ) : (
+          renderTaskList()
+        )}
+      </div>
+
+      {/* Error message */}
+      {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+
+      {/* Footer buttons */}
+      <div className="mt-4 space-y-2">
+        <Button
+          type="button"
+          onClick={handleAddToCalendar}
+          disabled={loading || isAddingToCalendar}
+          className="w-full"
+        >
+          {isAddingToCalendar ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Adding to Calendar...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Add to Calendar
+            </>
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setProcessingStep("input")}
+          disabled={loading}
+          className="w-full"
+        >
+          Back
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Desktop confirmation step rendering
+  const renderDesktopConfirmationStep = () => (
     <div className="py-4 flex flex-col">
       {/* Date and view toggle buttons */}
       <div className="flex items-center justify-between mb-4">
@@ -448,7 +628,11 @@ export default function NaturalLanguageModal({
         <div className="flex items-center space-x-2">
           <div className="text-sm text-slate-400 mr-1">Schedule for:</div>
           <Button
-            variant={selectedDate && isSameDay(selectedDate, new Date()) ? "default" : "outline"}
+            variant={
+              selectedDate && isSameDay(selectedDate, new Date())
+                ? "default"
+                : "outline"
+            }
             size="sm"
             onClick={() => updateAllTaskDates(new Date())}
             className="text-xs h-8"
@@ -456,7 +640,11 @@ export default function NaturalLanguageModal({
             Today ({getTodayDateString()})
           </Button>
           <Button
-            variant={selectedDate && isSameDay(selectedDate, addDays(new Date(), 1)) ? "default" : "outline"}
+            variant={
+              selectedDate && isSameDay(selectedDate, addDays(new Date(), 1))
+                ? "default"
+                : "outline"
+            }
             size="sm"
             onClick={() => updateAllTaskDates(addDays(new Date(), 1))}
             className="text-xs h-8"
@@ -465,15 +653,17 @@ export default function NaturalLanguageModal({
           </Button>
           <Popover>
             <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="text-xs h-8 flex items-center gap-1"
               >
                 <Calendar className="h-3.5 w-3.5" />
-                {selectedDate && !isSameDay(selectedDate, new Date()) && 
-                 !isSameDay(selectedDate, addDays(new Date(), 1)) ? 
-                  formatShortDate(selectedDate) : 'Custom'}
+                {selectedDate &&
+                !isSameDay(selectedDate, new Date()) &&
+                !isSameDay(selectedDate, addDays(new Date(), 1))
+                  ? formatShortDate(selectedDate)
+                  : "Custom"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -492,8 +682,10 @@ export default function NaturalLanguageModal({
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 w-8 p-0 ${viewMode === 'list' ? 'bg-slate-700' : ''}`}
-            onClick={() => setViewMode('list')}
+            className={`h-8 w-8 p-0 ${
+              viewMode === "list" ? "bg-slate-700" : ""
+            }`}
+            onClick={() => setViewMode("list")}
             title="List View"
           >
             <ListTodo className="h-4 w-4" />
@@ -501,24 +693,27 @@ export default function NaturalLanguageModal({
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 w-8 p-0 ${viewMode === 'calendar' ? 'bg-slate-700' : ''}`}
-            onClick={() => setViewMode('calendar')}
+            className={`h-8 w-8 p-0 ${
+              viewMode === "calendar" ? "bg-slate-700" : ""
+            }`}
+            onClick={() => setViewMode("calendar")}
             title="Calendar View"
           >
             <Columns className="h-4 w-4" />
           </Button>
         </div>
       </div>
-      
+
       {/* Task display - calendar or list */}
-      {viewMode === 'calendar' 
-        ? <TaskDayView tasks={extractedTasks} updateTaskField={updateTaskField} />
-        : renderTaskList()
-      }
-      
+      {viewMode === "calendar" ? (
+        <TaskDayView tasks={extractedTasks} updateTaskField={updateTaskField} />
+      ) : (
+        renderTaskList()
+      )}
+
       {/* Error message */}
       {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-      
+
       {/* Footer buttons */}
       <DialogFooter className="mt-2 flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
         <Button
@@ -552,21 +747,31 @@ export default function NaturalLanguageModal({
     </div>
   );
 
+  // Choose which confirmation step to render based on device
+  const renderConfirmationStep = () => {
+    return isMobile
+      ? renderMobileConfirmationStep()
+      : renderDesktopConfirmationStep();
+  };
+
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] w-[95vw]">
+      <DialogContent
+        className={`${
+          isMobile
+            ? "w-[95vw] max-h-[90vh] overflow-hidden"
+            : "sm:max-w-[600px]"
+        }`}
+      >
         <DialogHeader>
           <DialogTitle>
-            {processingStep === "input"
-              ? "Natural Language Input"
-              : "Confirm Tasks"}
+            {processingStep === "input" ? "Quick Add Tasks" : "Confirm Tasks"}
           </DialogTitle>
         </DialogHeader>
 
-        {processingStep === "input" 
-          ? renderInputStep() 
-          : renderConfirmationStep()
-        }
+        {processingStep === "input"
+          ? renderInputStep()
+          : renderConfirmationStep()}
       </DialogContent>
     </Dialog>
   );

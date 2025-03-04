@@ -126,10 +126,7 @@ export default function TaskModal({
         await onCreateTask(taskData);
         
         console.log("onCreateTask completed successfully, closing modal");
-        // Use a small delay before closing the modal to allow state updates to propagate
-        setTimeout(() => {
-          onClose();
-        }, 50);
+        onClose();
       } catch (err) {
         console.error("Error creating task:", err);
         setError("Failed to create task. Please try again.");

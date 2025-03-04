@@ -78,17 +78,32 @@ export async function POST(req: NextRequest) {
         {
           role: "system",
           content: `You are a helpful assistant that extracts tasks from user input.
+          
+          CURRENT DATE/TIME CONTEXT: 
+          - Current date: ${new Date().toISOString().split('T')[0]}
+          - Current time: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+          - Current timezone: Pacific Time (PT)
+          
           Extract the following information for each task mentioned:
           - title: (REQUIRED) The title of the task
           - startTime: (REQUIRED) The start time in HH:MM format (24h). Please use only 15-minute increments (00, 15, 30, 45)
           - duration: (REQUIRED) The duration in minutes (must be a number between 15 and 480)
           - priority: (REQUIRED) The priority level (must be exactly "high", "medium", or "low")
+          - date: (REQUIRED) The date for the task in ISO format (YYYY-MM-DD). 
           
-          IMPORTANT: 
+          IMPORTANT INSTRUCTIONS FOR DATE HANDLING:
+          - When the user mentions "tomorrow", use ${new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+          - When the user mentions "next week", use ${new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]}
+          - When the user mentions "tonight", use today's date: ${new Date().toISOString().split('T')[0]}
+          - Pay careful attention to ANY relative date indicators (tomorrow, next Friday, in two days, etc.)
+          - If no specific date is mentioned, default to today's date: ${new Date().toISOString().split('T')[0]}
+          
+          ADDITIONAL IMPORTANT NOTES:
           - DO NOT include descriptions in your output. Only extract titles.
           - All fields are REQUIRED. Always include a numeric duration.
           - If duration is not specified, use a reasonable default based on the task type (30-60 minutes).
           - For start times, always round to the nearest 15-minute increment (00, 15, 30, or 45 minutes).
+          - Always convert AM/PM times to 24-hour format (e.g., "9pm" becomes "21:00").
           
           Format your response as a JSON object with a "tasks" array containing the extracted tasks.
           For example:
@@ -98,7 +113,15 @@ export async function POST(req: NextRequest) {
                 "title": "Team meeting",
                 "startTime": "09:00",
                 "duration": 60,
-                "priority": "high"
+                "priority": "high",
+                "date": "${new Date().toISOString().split('T')[0]}" // today
+              },
+              {
+                "title": "Doctor appointment",
+                "startTime": "14:30",
+                "duration": 45,
+                "priority": "high",
+                "date": "${new Date(Date.now() + 86400000).toISOString().split('T')[0]}" // tomorrow
               }
             ]
           }`
@@ -134,15 +157,41 @@ export async function POST(req: NextRequest) {
       console.log("Processing and applying defaults to tasks");
       const processedTasks = tasks.map((task: any, index: number) => {
         console.log(`Processing task ${index}:`, JSON.stringify(task));
+        
+        // Parse date with proper handling
+        let taskDate: Date;
+        if (task.date) {
+          try {
+            taskDate = new Date(task.date);
+            // Check if date is valid
+            if (isNaN(taskDate.getTime())) {
+              console.warn(`Invalid date format for task ${index}: ${task.date}, using today's date instead`);
+              taskDate = new Date();
+            } else {
+              console.log(`Task ${index} has valid date: ${taskDate.toISOString()}`);
+            }
+          } catch (e) {
+            console.warn(`Error parsing date for task ${index}: ${e}`);
+            taskDate = new Date();
+          }
+        } else {
+          taskDate = new Date();
+        }
+        
         // Apply defaults and clean up task data
         const processedTask = {
           title: task.title || "Untitled Task",
           description: "", // Initialize with empty string - no automatic description
           startTime: roundToNearest15Minutes(task.startTime || "12:00"), // Round to nearest 15 min
           duration: typeof task.duration === 'number' ? task.duration : 30, // Default 30 minutes
-          priority: ["high", "medium", "low"].includes(task.priority) ? task.priority : "medium"
+          priority: ["high", "medium", "low"].includes(task.priority) ? task.priority : "medium",
+          date: taskDate // Use properly parsed date
         };
-        console.log(`Task ${index} after processing:`, JSON.stringify(processedTask));
+        
+        console.log(`Task ${index} after processing:`, JSON.stringify({
+          ...processedTask,
+          date: processedTask.date.toISOString() // For logging only
+        }));
         return processedTask;
       });
       

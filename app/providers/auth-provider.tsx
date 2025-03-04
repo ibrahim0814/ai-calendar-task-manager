@@ -55,19 +55,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Google sign in function
   const signInWithGoogle = async () => {
     try {
+      // Set a cookie to remember this user has visited before
+      document.cookie = "returning_user=true; path=/; max-age=31536000"; // 1 year
+      
       const result = await signIn('google', {
         redirect: false,
         callbackUrl: '/',
+        // Don't prompt for consent if user is returning
+        prompt: document.cookie.includes('returning_user=true') ? 'none' : 'consent'
       });
       
       if (result?.ok) {
         // On successful sign in, the useSession hook will
         // update with the new session data
         router.replace('/');
-      } else {
-        // Handle error
+      } else if (result?.error) {
+        console.error("Sign in error:", result.error);
       }
     } catch (error) {
+      console.error("Sign in exception:", error);
     }
   };
 

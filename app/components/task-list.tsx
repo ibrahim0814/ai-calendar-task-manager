@@ -14,7 +14,7 @@ interface TaskListProps {
   isLoading?: boolean
 }
 
-export default function TaskList({ tasks, onDeleteTask, onEditTask, onViewTask }: TaskListProps) {
+export default function TaskList({ tasks, onDeleteTask, onEditTask, onViewTask, isLoading }: TaskListProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
@@ -48,11 +48,22 @@ export default function TaskList({ tasks, onDeleteTask, onEditTask, onViewTask }
   return (
     <>
       <div className="space-y-2">
-        {tasks.map((task) => (
-          <div 
-            key={task.googleEventId || `task-${Math.random().toString(36).substr(2, 9)}`}
-            className="bg-slate-800 p-3 rounded-lg border border-slate-700 relative group hover:border-slate-600 transition-colors cursor-pointer"
-            onClick={() => onViewTask(task.googleEventId || task.id || '')}
+        {isLoading ? (
+          <div className="flex items-center justify-center p-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="text-slate-400 p-8 text-center rounded-md empty-task-message">
+            <div className="mb-2">📅</div>
+            <div>No tasks scheduled for this day</div>
+            <div className="text-sm mt-2 text-slate-500">Select a date with tasks or add a new one</div>
+          </div>
+        ) : (
+          tasks.map((task) => (
+            <div 
+              key={task.googleEventId || `task-${Math.random().toString(36).substr(2, 9)}`}
+              className="bg-slate-800 p-3 rounded-lg border border-slate-700 relative group hover:border-slate-600 transition-colors cursor-pointer"
+              onClick={() => onViewTask(task.googleEventId || task.id || '')}
           >
             <div className="flex justify-between items-center">
               <div>
@@ -91,7 +102,8 @@ export default function TaskList({ tasks, onDeleteTask, onEditTask, onViewTask }
               </div>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
 
       <ConfirmationModal 

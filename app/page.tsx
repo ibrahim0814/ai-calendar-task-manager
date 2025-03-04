@@ -12,11 +12,13 @@ import {
   Edit,
   ChevronDown,
   MessageSquare,
+  List,
 } from "lucide-react";
 import { useAuth } from "./providers/auth-provider";
+import { useIsMobile } from "./hooks/use-mobile";
 import { signOut } from "next-auth/react";
 import { Task, TaskExtract } from "@/lib/types";
-import { addDays, isSameDay } from "date-fns";
+import { addDays, isSameDay, getDaysInMonth, differenceInDays, endOfMonth, endOfYear } from "date-fns";
 import ProtectedRoute from "./components/protected-route";
 import TaskModal from "./components/task-modal";
 import TaskDetailsModal from "./components/task-details-modal";
@@ -33,8 +35,10 @@ import Image from "next/image";
 
 function HomePage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'tasks' | 'calendar'>('tasks');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNaturalLanguageModalOpen, setIsNaturalLanguageModalOpen] =
     useState(false);
@@ -53,6 +57,18 @@ function HomePage() {
         : format(new Date(), "EEEE, MMMM d, yyyy"),
     [selectedDate]
   );
+  
+  // Calculate days left in month and year
+  const { daysLeftInMonth, daysLeftInYear } = useMemo(() => {
+    const today = new Date();
+    const monthEnd = endOfMonth(today);
+    const yearEnd = endOfYear(today);
+    
+    return {
+      daysLeftInMonth: differenceInDays(monthEnd, today) + 1, // Include today
+      daysLeftInYear: differenceInDays(yearEnd, today) + 1    // Include today
+    };
+  }, []);
 
   // Filter tasks for the selected date
   const tasksForSelectedDate = useMemo(() => {
@@ -117,15 +133,30 @@ function HomePage() {
       fetchTasksForMonth(currentMonth, currentYear);
     }
   }, [currentMonth, currentYear, user, fetchTasksForMonth]);
+  
+  // When a date is selected on the calendar view, switch to the tasks tab on mobile
+  useEffect(() => {
+    if (isMobile && selectedDate) {
+      setActiveTab('tasks');
+    }
+  }, [selectedDate, isMobile]);
 
   // Handle month change from calendar
   const handleMonthChange = (month: number, year: number) => {
     setCurrentMonth(month);
     setCurrentYear(year);
   };
+  
+  // Handle tab change
+  const handleTabChange = (tab: 'tasks' | 'calendar') => {
+    setActiveTab(tab);
+  };
 
   // Handle create task
   const handleCreateTask = async (task: Omit<Task, "id">) => {
+    // Store original overflow value to restore it later
+    const originalOverflow = document.body.style.overflow;
+
     try {
       console.log("Creating task:", task);
       setLoading(true);
@@ -154,18 +185,19 @@ function HomePage() {
 
       // Refresh the tasks for the current month
       await fetchTasksForMonth(currentMonth, currentYear);
-      
+
       return createdTask;
     } catch (error) {
       console.error("Error creating task:", error);
       throw error;
     } finally {
-      // Make sure we always reset loading state and restore overflow
-      setLoading(false);
-      // Re-enable scrolling if it was disabled
-      if (document.body.style.overflow === "hidden") {
-        document.body.style.overflow = "";
-      }
+      // Use a small timeout to ensure UI updates properly before enabling interaction
+      setTimeout(() => {
+        setLoading(false);
+        // Restore original overflow setting
+        document.body.style.overflow = originalOverflow;
+        console.log("UI fully restored after task creation");
+      }, 100);
     }
   };
 
@@ -199,12 +231,13 @@ function HomePage() {
     }
   };
 
-  // Handle edit task functionality
+  // Handle edit task functionality - now using natural language instead of modal
   const handleEditTask = (taskId: string) => {
     const taskToEdit = tasks.find((t) => t.id === taskId);
     if (taskToEdit) {
       setTaskToEdit(taskToEdit);
-      setIsModalOpen(true);
+      // Open natural language modal instead of manual modal
+      setIsNaturalLanguageModalOpen(true);
     }
   };
 
@@ -228,25 +261,29 @@ function HomePage() {
       try {
         // Apply the selected date to the task if provided
         const taskDate = task.date || new Date();
-        
+
         // Create dates based on the scheduled date and the provided time
         const [hours, minutes] = task.startTime.split(":").map(Number);
         const taskStartDate = new Date(taskDate);
         taskStartDate.setHours(hours, minutes, 0, 0);
-        
+
         const taskEndDate = new Date(taskStartDate);
         taskEndDate.setMinutes(taskStartDate.getMinutes() + task.duration);
-        
-        console.log(`Creating task: ${task.title}, date: ${taskDate.toISOString()}`);
-        console.log(`Start time: ${taskStartDate.toISOString()}, end time: ${taskEndDate.toISOString()}`);
-        
+
+        console.log(
+          `Creating task: ${task.title}, date: ${taskDate.toISOString()}`
+        );
+        console.log(
+          `Start time: ${taskStartDate.toISOString()}, end time: ${taskEndDate.toISOString()}`
+        );
+
         const newTask = {
           title: task.title,
           description: task.description || "",
           startTime: taskStartDate.toISOString(),
           endTime: taskEndDate.toISOString(),
           priority: task.priority || "medium",
-          date: taskDate.toISOString().split('T')[0], // Store just the date part
+          date: taskDate.toISOString().split("T")[0], // Store just the date part
         };
 
         console.log("Prepared task:", newTask);
@@ -287,22 +324,19 @@ function HomePage() {
 
       // Store original overflow value to restore it later
       const originalOverflow = document.body.style.overflow;
-      
-      // Prevent scrolling issues
-      document.body.style.overflow = "hidden";
-      
+
       // Start loading
       setLoading(true);
 
       try {
         // Create array of promises to create all tasks in parallel
-        const taskPromises = extractedTasks.map(task => 
-          handleCreateTaskFromNL(task).catch(err => {
+        const taskPromises = extractedTasks.map((task) =>
+          handleCreateTaskFromNL(task).catch((err) => {
             console.error(`Failed to create task: ${task.title}`, err);
             return null;
           })
         );
-        
+
         // Wait for all tasks to be created
         const results = await Promise.all(taskPromises);
         const createdTasks = results.filter(Boolean);
@@ -313,9 +347,6 @@ function HomePage() {
 
         // Refresh tasks for the current month
         await fetchTasksForMonth(currentMonth, currentYear);
-        
-        // Close the natural language modal
-        setIsNaturalLanguageModalOpen(false);
       } catch (error) {
         console.error("Error creating tasks from extraction:", error);
       } finally {
@@ -325,10 +356,19 @@ function HomePage() {
           // Re-enable scrolling
           document.body.style.overflow = originalOverflow;
           console.log("UI fully restored after natural language task creation");
+
+          // Close the natural language modal - moved to finally block to ensure cleanup
+          setIsNaturalLanguageModalOpen(false);
         }, 100);
       }
     },
-    [handleCreateTaskFromNL, setIsNaturalLanguageModalOpen, fetchTasksForMonth, currentMonth, currentYear]
+    [
+      handleCreateTaskFromNL,
+      setIsNaturalLanguageModalOpen,
+      fetchTasksForMonth,
+      currentMonth,
+      currentYear,
+    ]
   );
 
   return (
@@ -340,30 +380,16 @@ function HomePage() {
               Smart Scheduler <CalendarDays className="ml-2 h-5 w-5" />
             </h1>
 
-            <div className="flex items-center gap-4">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="sm"
-                    className="flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden md:inline">Add Tasks</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => setIsNaturalLanguageModalOpen(true)}
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    <span>Natural Language</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsModalOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    <span>Manual Entry</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <div className="flex items-center">
+              <Button
+                size="sm"
+                variant="default"
+                className="flex items-center gap-1"
+                onClick={() => setIsNaturalLanguageModalOpen(true)}
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden md:inline">Add Tasks</span>
+              </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -417,50 +443,141 @@ function HomePage() {
           </div>
         </header>
 
-        <main className="p-4 flex flex-col md:flex-row h-[calc(100vh-74px)] overflow-hidden">
-          <div className="w-full md:w-2/3 mb-6 md:mb-0 md:pr-4 h-full flex flex-col">
-            <CalendarView
-              tasks={tasks}
-              onDateSelect={setSelectedDate}
-              selectedDate={selectedDate}
-              onMonthChange={handleMonthChange}
-            />
-          </div>
+        <main className={`p-4 ${isMobile ? 'mobile-container' : 'flex flex-col md:flex-row h-[calc(100vh-74px)] overflow-hidden'}`}>
+          {/* Conditionally render layout based on mobile/desktop */}
+          {isMobile ? (
+            /* Mobile Layout - Tabbed interface */
+            <>
+              {/* Date Display - Above tabs */}
+              <div className="w-full date-banner">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">{format(new Date(), "EEEE, MMMM d")}</h2>
+                    <p className="text-sm text-slate-400">{format(new Date(), "yyyy")}</p>
+                  </div>
+                  <div className="flex gap-3 flex-shrink-0">
+                    <div className="days-counter counter-month">
+                      <span className="text-blue-400 font-bold">{daysLeftInMonth}</span>
+                      <span className="text-slate-400 mt-0.5">days left</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">in month</span>
+                    </div>
+                    <div className="days-counter counter-year">
+                      <span className="text-purple-400 font-bold">{daysLeftInYear}</span>
+                      <span className="text-slate-400 mt-0.5">days left</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">in year</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Tab buttons */}
+              <div className="flex w-full mb-4 border-b border-slate-800">
+                <button 
+                  onClick={() => handleTabChange('tasks')}
+                  className={`flex items-center gap-2 px-4 py-2 w-1/2 justify-center ${activeTab === 'tasks' ? 'border-b-2 border-blue-400 text-blue-400 font-medium' : 'text-slate-400'}`}
+                >
+                  <List className="h-4 w-4" />
+                  <span>Tasks</span>
+                </button>
+                <button 
+                  onClick={() => handleTabChange('calendar')}
+                  className={`flex items-center gap-2 px-4 py-2 w-1/2 justify-center ${activeTab === 'calendar' ? 'border-b-2 border-blue-400 text-blue-400 font-medium' : 'text-slate-400'}`}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  <span>Calendar</span>
+                </button>
+              </div>
+              
+              {/* Content based on active tab */}
+              <div className="w-full flex-1 h-[calc(100vh-200px)] overflow-hidden">
+                {activeTab === 'tasks' ? (
+                  /* Tasks Tab */
+                  <div className="h-full flex flex-col task-tab-content">
+                    <div className="flex justify-between items-center mb-3">
+                      {/* Removed "Today's Tasks" heading */}
+                    </div>
+                    
+                    <div className="flex-1 rounded-md p-3 bg-slate-900/50">
+                      <TaskList
+                        tasks={tasksForSelectedDate}
+                        onDeleteTask={handleDeleteTask}
+                        onEditTask={handleEditTask}
+                        onViewTask={handleViewTaskDetails}
+                        isLoading={loading}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Calendar Tab */
+                  <div className="h-full calendar-tab-content">
+                    <CalendarView
+                      tasks={tasks}
+                      onDateSelect={(date) => {
+                        setSelectedDate(date);
+                        // When selecting a date on mobile, switch to tasks tab
+                        setActiveTab('tasks');
+                      }}
+                      selectedDate={selectedDate}
+                      onMonthChange={handleMonthChange}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* Desktop Layout - Calendar on left, Tasks on right */
+            <>
+              <div className="w-full md:w-2/3 mb-6 md:mb-0 md:pr-4 h-full flex flex-col">
+                <CalendarView
+                  tasks={tasks}
+                  onDateSelect={setSelectedDate}
+                  selectedDate={selectedDate}
+                  onMonthChange={handleMonthChange}
+                />
+              </div>
 
-          <div className="w-full md:w-1/3 md:border-l md:border-slate-800 md:pl-4 h-full overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">{formattedDate}</h2>
-            </div>
+              <div className="w-full md:w-1/3 md:border-l md:border-slate-800 md:pl-4 h-full overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold">{formattedDate}</h2>
+                  <div className="flex gap-3 flex-shrink-0 hidden md:flex">
+                    <div className="days-counter counter-month">
+                      <span className="text-blue-400 font-bold">{daysLeftInMonth}</span>
+                      <span className="text-slate-400 mt-0.5">days left</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">in month</span>
+                    </div>
+                    <div className="days-counter counter-year">
+                      <span className="text-purple-400 font-bold">{daysLeftInYear}</span>
+                      <span className="text-slate-400 mt-0.5">days left</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">in year</span>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="overflow-y-auto h-full">
-              <TaskList
-                tasks={tasksForSelectedDate}
-                onDeleteTask={handleDeleteTask}
-                onEditTask={handleEditTask}
-                onViewTask={handleViewTaskDetails}
-                isLoading={loading}
-              />
-            </div>
-          </div>
+                <div className="overflow-y-auto h-full">
+                  <TaskList
+                    tasks={tasksForSelectedDate}
+                    onDeleteTask={handleDeleteTask}
+                    onEditTask={handleEditTask}
+                    onViewTask={handleViewTaskDetails}
+                    isLoading={loading}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </main>
 
         {/* Task Modal */}
-        {isModalOpen && (
-          <TaskModal
-            onClose={() => {
-              setIsModalOpen(false);
-              setTaskToEdit(null);
-            }}
-            onCreateTask={handleCreateTask}
-            taskToEdit={taskToEdit}
-          />
-        )}
 
         {/* Natural Language Modal */}
         {isNaturalLanguageModalOpen && (
           <NaturalLanguageModal
-            onClose={() => setIsNaturalLanguageModalOpen(false)}
+            onClose={() => {
+              setIsNaturalLanguageModalOpen(false);
+              setTaskToEdit(null);
+            }}
             onCreateTasks={handleCreateTasksFromExtract}
+            taskToEdit={taskToEdit}
           />
         )}
 
@@ -469,8 +586,8 @@ function HomePage() {
           <TaskDetailsModal
             task={viewTaskDetails}
             onClose={() => setViewTaskDetails(null)}
-            onDelete={handleDeleteTask}
-            onEdit={handleEditTask}
+            onDelete={() => handleDeleteTask(viewTaskDetails.id)}
+            onEdit={() => handleEditTask(viewTaskDetails.id)}
           />
         )}
       </div>
