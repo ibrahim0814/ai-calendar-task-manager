@@ -26,10 +26,9 @@ const TaskItem = memo(
     task,
     index,
     updateTaskField,
-    moveTaskUp,
-    moveTaskDown,
     onDragStart,
     isDragging,
+    isPlaceholderOnly,
   }: {
     task: TaskExtract;
     index: number;
@@ -38,10 +37,9 @@ const TaskItem = memo(
       field: keyof TaskExtract,
       value: any
     ) => void;
-    moveTaskUp: (index: number) => void;
-    moveTaskDown: (index: number) => void;
     onDragStart: (index: number) => void;
     isDragging?: boolean;
+    isPlaceholderOnly?: boolean;
   }) => {
     // Parse task time for positioning
     const taskTime = parse(task.startTime, "HH:mm", new Date());
@@ -68,17 +66,22 @@ const TaskItem = memo(
       }
     };
 
-    // Handle moving task up 30 minutes
-    const handleMoveUp = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      moveTaskUp(index);
-    };
-
-    // Handle moving task down 30 minutes
-    const handleMoveDown = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      moveTaskDown(index);
-    };
+    // If this is a placeholder only, render just the outline
+    if (isPlaceholderOnly) {
+      return (
+        <div
+          className="absolute left-12 right-0 border-2 border-dashed border-slate-600/30 rounded-md pointer-events-none"
+          style={{
+            top: `${topPosition}px`,
+            height: `${heightPx}px`,
+            minHeight: "25px",
+            zIndex: 20,
+          }}
+          data-placeholder="true"
+          data-task-index={index}
+        />
+      );
+    }
 
     // Handle pointer down
     const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -87,18 +90,6 @@ const TaskItem = memo(
 
       // Set dragging state
       onDragStart(index);
-    };
-
-    // Handle drag start
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // Set data transfer for drag
-      if (e.dataTransfer) {
-        e.dataTransfer.setData("text/plain", index.toString());
-        e.dataTransfer.effectAllowed = "move";
-      }
     };
 
     return (
@@ -118,27 +109,9 @@ const TaskItem = memo(
           WebkitUserSelect: "none",
         }}
         onPointerDown={handlePointerDown}
-        onDragStart={handleDragStart}
-        draggable="true"
         data-task-item="true"
         data-task-index={index}
       >
-        {/* Control buttons visible on hover */}
-        <div className="absolute -right-8 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            className="h-6 w-6 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center"
-            onClick={handleMoveUp}
-          >
-            <ChevronsUpDown className="h-4 w-4 rotate-180" />
-          </button>
-          <button
-            className="h-6 w-6 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center"
-            onClick={handleMoveDown}
-          >
-            <ChevronsUpDown className="h-4 w-4" />
-          </button>
-        </div>
-
         {/* Task content */}
         <div className="px-2 flex justify-between items-start h-full">
           <div className="overflow-hidden">
@@ -189,22 +162,64 @@ export default function TaskDayView({
   tasks,
   updateTaskField,
 }: TaskDayViewProps) {
+  // Clone the tasks to create immutable copies
+  const [internalTasks, setInternalTasks] = useState<TaskExtract[]>([]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [draggingTask, setDraggingTask] = useState<TaskExtract | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const dragStartTime = useRef<string>("");
-  const isMobile = useIsMobile();
   const isDragging = useRef<boolean>(false);
   const lastMoveTime = useRef<number>(0);
   const scrollInterval = useRef<number | null>(null);
 
+  // Synchronize internal tasks with provided tasks when they change
+  useEffect(() => {
+    // Only update internal tasks when not dragging to prevent issues
+    if (!isDragging.current) {
+      setInternalTasks(JSON.parse(JSON.stringify(tasks)));
+    }
+  }, [tasks]);
+
+  // Handle drag start
+  const handleDragStart = useCallback(
+    (index: number) => {
+      console.log(`Starting drag for task ${index}`);
+
+      // Create a deep clone of the task being dragged
+      const taskToEdit = JSON.parse(JSON.stringify(internalTasks[index]));
+
+      setDraggingIndex(index);
+      setDraggingTask(taskToEdit);
+      isDragging.current = true;
+
+      // Disable pointer events on time slots to prevent interference
+      if (timelineRef.current) {
+        Array.from(
+          timelineRef.current.querySelectorAll('[data-time-slot="true"]')
+        ).forEach((elem) => {
+          (elem as HTMLElement).style.pointerEvents = "none";
+        });
+      }
+
+      // Set cursor for the entire document during drag
+      document.body.style.cursor = "grabbing";
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+    },
+    [internalTasks]
+  );
+
   // Function to move a task up by 30 minutes
   const moveTaskUp = useCallback(
     (index: number) => {
-      if (!tasks[index]) return;
+      if (!internalTasks[index]) return;
+
+      // Create a copy of the tasks
+      const updatedTasks = [...internalTasks];
+      const task = updatedTasks[index];
 
       // Parse current start time
-      const currentTime = parse(tasks[index].startTime, "HH:mm", new Date());
+      const currentTime = parse(task.startTime, "HH:mm", new Date());
 
       // Calculate new time 30 minutes earlier
       const newMinutes = currentTime.getMinutes() - MINUTES_INTERVAL;
@@ -220,7 +235,14 @@ export default function TaskDayView({
           .toString()
           .padStart(2, "0")}:${adjustedMinutes.toString().padStart(2, "0")}`;
 
-        console.log(`Moving task ${index} up to ${newTime}`);
+        // Update internal state first
+        updatedTasks[index] = {
+          ...task,
+          startTime: newTime,
+        };
+        setInternalTasks(updatedTasks);
+
+        // Update parent state
         updateTaskField(index, "startTime", newTime);
       } else {
         // Format the new time as HH:mm
@@ -228,20 +250,31 @@ export default function TaskDayView({
           .toString()
           .padStart(2, "0")}`;
 
-        console.log(`Moving task ${index} up to ${newTime}`);
+        // Update internal state first
+        updatedTasks[index] = {
+          ...task,
+          startTime: newTime,
+        };
+        setInternalTasks(updatedTasks);
+
+        // Update parent state
         updateTaskField(index, "startTime", newTime);
       }
     },
-    [updateTaskField, tasks]
+    [internalTasks, updateTaskField]
   );
 
   // Function to move a task down by 30 minutes
   const moveTaskDown = useCallback(
     (index: number) => {
-      if (!tasks[index]) return;
+      if (!internalTasks[index]) return;
+
+      // Create a copy of the tasks
+      const updatedTasks = [...internalTasks];
+      const task = updatedTasks[index];
 
       // Parse current start time
-      const currentTime = parse(tasks[index].startTime, "HH:mm", new Date());
+      const currentTime = parse(task.startTime, "HH:mm", new Date());
 
       // Calculate new time 30 minutes later
       const newMinutes = currentTime.getMinutes() + MINUTES_INTERVAL;
@@ -257,7 +290,14 @@ export default function TaskDayView({
           .toString()
           .padStart(2, "0")}:${adjustedMinutes.toString().padStart(2, "0")}`;
 
-        console.log(`Moving task ${index} down to ${newTime}`);
+        // Update internal state first
+        updatedTasks[index] = {
+          ...task,
+          startTime: newTime,
+        };
+        setInternalTasks(updatedTasks);
+
+        // Update parent state
         updateTaskField(index, "startTime", newTime);
       } else {
         // Format the new time as HH:mm
@@ -265,11 +305,18 @@ export default function TaskDayView({
           .toString()
           .padStart(2, "0")}`;
 
-        console.log(`Moving task ${index} down to ${newTime}`);
+        // Update internal state first
+        updatedTasks[index] = {
+          ...task,
+          startTime: newTime,
+        };
+        setInternalTasks(updatedTasks);
+
+        // Update parent state
         updateTaskField(index, "startTime", newTime);
       }
     },
-    [updateTaskField, tasks]
+    [internalTasks, updateTaskField]
   );
 
   // Calculate new time based on position
@@ -280,20 +327,21 @@ export default function TaskDayView({
       // Get container position details
       const containerRect = containerRef.current.getBoundingClientRect();
       const timelineTop = containerRect.top + 2; // 2px for padding
-
-      // Calculate cursor position relative to timeline
-      const relativeY = Math.max(0, clientY - timelineTop);
-
-      // Auto-scroll if near edges
-      const scrollThreshold = 60; // pixels from edge to trigger scroll
       const scrollContainer = containerRef.current;
 
+      // Calculate cursor position relative to timeline
+      const relativeY =
+        Math.max(0, clientY - timelineTop) + scrollContainer.scrollTop;
+
+      // Auto-scroll if near edges (with reduced speed)
+      const scrollThreshold = 80; // pixels from edge to trigger scroll
+
       if (clientY < containerRect.top + scrollThreshold) {
-        // Scroll up more aggressively when near the top
+        // Scroll up with reduced speed
         const distanceFromTop = clientY - containerRect.top;
         const scrollSpeed = Math.max(
-          5,
-          Math.round((scrollThreshold - distanceFromTop) / 2)
+          2, // Slower minimum speed
+          Math.round((scrollThreshold - distanceFromTop) / 5) // Reduced divisor for slower scrolling
         );
 
         // Apply scroll - negative value scrolls up
@@ -302,11 +350,11 @@ export default function TaskDayView({
           behavior: "auto",
         });
       } else if (clientY > containerRect.bottom - scrollThreshold) {
-        // Scroll down when near the bottom
+        // Scroll down with reduced speed
         const distanceFromBottom = containerRect.bottom - clientY;
         const scrollSpeed = Math.max(
-          5,
-          Math.round((scrollThreshold - distanceFromBottom) / 2)
+          2, // Slower minimum speed
+          Math.round((scrollThreshold - distanceFromBottom) / 5) // Reduced divisor for slower scrolling
         );
 
         // Apply scroll - positive value scrolls down
@@ -316,20 +364,14 @@ export default function TaskDayView({
         });
       }
 
-      // Use the cursor position to determine time, accounting for scroll position
       const minutesFromTop =
-        Math.floor((relativeY + scrollContainer.scrollTop) / SLOT_HEIGHT) *
-        MINUTES_INTERVAL;
+        Math.floor(relativeY / SLOT_HEIGHT) * MINUTES_INTERVAL;
 
-      // Calculate hours and minutes
       const hours = Math.floor(minutesFromTop / 60);
       const minutes = minutesFromTop % 60;
-
-      // Ensure valid time values (0-23 hours, 0-59 minutes)
       const validHours = Math.min(23, Math.max(0, hours));
       const validMinutes = Math.min(59, Math.max(0, minutes));
 
-      // Format as HH:MM
       return `${validHours.toString().padStart(2, "0")}:${validMinutes
         .toString()
         .padStart(2, "0")}`;
@@ -340,7 +382,8 @@ export default function TaskDayView({
   // Handle pointer move
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
-      if (draggingIndex === null || !isDragging.current) return;
+      if (draggingIndex === null || !isDragging.current || !draggingTask)
+        return;
 
       // Throttle updates to every 16ms (roughly 60fps)
       const now = Date.now();
@@ -349,28 +392,43 @@ export default function TaskDayView({
 
       const newTimeString = calculateNewTime(e.clientY);
       if (newTimeString) {
-        updateTaskField(draggingIndex, "startTime", newTimeString);
+        // Update only the dragging task's copy
+        setDraggingTask((prevTask) => {
+          if (!prevTask) return null;
+          return {
+            ...prevTask,
+            startTime: newTimeString,
+          };
+        });
       }
 
       // Keep updating task position even when pointer isn't moving but we're near an edge
       if (containerRef.current) {
         const containerRect = containerRef.current.getBoundingClientRect();
+        // Use the larger threshold to match calculateNewTime
+        const scrollThreshold = 80;
+
         if (
-          e.clientY < containerRect.top + 60 ||
-          e.clientY > containerRect.bottom - 60
+          e.clientY < containerRect.top + scrollThreshold ||
+          e.clientY > containerRect.bottom - scrollThreshold
         ) {
           // Start continuous scrolling if not already started
           if (scrollInterval.current === null) {
+            // Use a slower refresh rate of 100ms instead of 50ms to reduce visual jumping
             scrollInterval.current = window.setInterval(() => {
+              // Calculate new time using the same function
               const latestNewTimeString = calculateNewTime(e.clientY);
               if (latestNewTimeString) {
-                updateTaskField(
-                  draggingIndex,
-                  "startTime",
-                  latestNewTimeString
-                );
+                // Update only the dragging task's copy
+                setDraggingTask((prevTask) => {
+                  if (!prevTask) return null;
+                  return {
+                    ...prevTask,
+                    startTime: latestNewTimeString,
+                  };
+                });
               }
-            }, 50);
+            }, 100);
           }
         } else {
           // Clear interval if we're not near an edge
@@ -381,7 +439,7 @@ export default function TaskDayView({
         }
       }
     },
-    [draggingIndex, updateTaskField, calculateNewTime]
+    [draggingIndex, draggingTask, calculateNewTime]
   );
 
   // End dragging
@@ -390,7 +448,20 @@ export default function TaskDayView({
 
     console.log(`Ending drag for task ${draggingIndex}`);
 
+    // Only now apply the changes to the parent state
+    if (draggingIndex !== null && draggingTask) {
+      updateTaskField(draggingIndex, "startTime", draggingTask.startTime);
+
+      // Update our internal copy too
+      setInternalTasks((prev) => {
+        const updatedTasks = [...prev];
+        updatedTasks[draggingIndex] = draggingTask;
+        return updatedTasks;
+      });
+    }
+
     setDraggingIndex(null);
+    setDraggingTask(null);
     isDragging.current = false;
 
     // Clear any active scroll interval
@@ -417,7 +488,7 @@ export default function TaskDayView({
     if (window.getSelection) {
       window.getSelection()?.empty();
     }
-  }, [draggingIndex]);
+  }, [draggingIndex, draggingTask, updateTaskField]);
 
   // Set up event listeners
   useEffect(() => {
@@ -461,42 +532,105 @@ export default function TaskDayView({
           {/* Time slots */}
           <div className="ml-12">{timeSlots}</div>
 
-          {/* Tasks */}
-          {tasks.map((task, index) => (
-            <TaskItem
-              key={index}
-              task={task}
-              index={index}
-              updateTaskField={updateTaskField}
-              moveTaskUp={moveTaskUp}
-              moveTaskDown={moveTaskDown}
-              onDragStart={setDraggingIndex}
-              isDragging={draggingIndex === index}
-            />
-          ))}
+          {/* Non-dragging state: Display all tasks normally */}
+          {!isDragging.current &&
+            internalTasks.map((task, index) => (
+              <TaskItem
+                key={`normal-${index}`}
+                task={task}
+                index={index}
+                updateTaskField={updateTaskField}
+                onDragStart={handleDragStart}
+                isDragging={false}
+              />
+            ))}
 
-          {/* Visual indicator for dragging */}
-          {draggingIndex !== null && (
-            <div
-              className="absolute left-12 right-0 h-[2px] bg-blue-500 pointer-events-none"
-              style={{
-                top: `${
-                  ((parse(
-                    tasks[draggingIndex].startTime,
-                    "HH:mm",
-                    new Date()
-                  ).getHours() *
-                    60 +
-                    parse(
-                      tasks[draggingIndex].startTime,
-                      "HH:mm",
-                      new Date()
-                    ).getMinutes()) /
-                    MINUTES_INTERVAL) *
-                  SLOT_HEIGHT
-                }px`,
-              }}
-            />
+          {/* Dragging state: Display placeholders + dragging task */}
+          {isDragging.current && draggingIndex !== null && (
+            <>
+              {/* Display placeholders for all tasks except the dragging one */}
+              {internalTasks.map((task, index) =>
+                index !== draggingIndex ? (
+                  <TaskItem
+                    key={`placeholder-${index}`}
+                    task={task}
+                    index={index}
+                    updateTaskField={updateTaskField}
+                    onDragStart={handleDragStart}
+                    isPlaceholderOnly={true}
+                  />
+                ) : null
+              )}
+
+              {/* Display the dragging task */}
+              {draggingTask && (
+                <TaskItem
+                  key={`dragging-${draggingIndex}`}
+                  task={draggingTask}
+                  index={draggingIndex}
+                  updateTaskField={updateTaskField}
+                  onDragStart={handleDragStart}
+                  isDragging={true}
+                />
+              )}
+
+              {/* Position indicator line */}
+              {draggingTask && (
+                <>
+                  {/* Horizontal position indicator line */}
+                  <div
+                    className="absolute left-12 right-0 h-[2px] bg-blue-500 pointer-events-none"
+                    style={{
+                      top: `${
+                        ((parse(
+                          draggingTask.startTime,
+                          "HH:mm",
+                          new Date()
+                        ).getHours() *
+                          60 +
+                          parse(
+                            draggingTask.startTime,
+                            "HH:mm",
+                            new Date()
+                          ).getMinutes()) /
+                          MINUTES_INTERVAL) *
+                        SLOT_HEIGHT
+                      }px`,
+                      zIndex: 60,
+                    }}
+                  />
+
+                  {/* Time indicator */}
+                  <div
+                    className="absolute left-0 px-2 py-1 bg-blue-500 text-white text-xs rounded-sm font-medium pointer-events-none"
+                    style={{
+                      top: `${
+                        ((parse(
+                          draggingTask.startTime,
+                          "HH:mm",
+                          new Date()
+                        ).getHours() *
+                          60 +
+                          parse(
+                            draggingTask.startTime,
+                            "HH:mm",
+                            new Date()
+                          ).getMinutes()) /
+                          MINUTES_INTERVAL) *
+                        SLOT_HEIGHT
+                      }px`,
+                      transform: "translateY(-50%)",
+                      zIndex: 60,
+                    }}
+                  >
+                    {format(
+                      parse(draggingTask.startTime, "HH:mm", new Date()),
+                      "h:mm a"
+                    )}
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>

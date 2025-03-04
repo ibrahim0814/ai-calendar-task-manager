@@ -864,12 +864,6 @@ export default function NaturalLanguageModal({
           <DialogTitle className="text-xl font-semibold">
             {processingStep === "input" ? "Quick Add Tasks" : "Confirm Tasks"}
           </DialogTitle>
-          {processingStep === "input" && (
-            <DialogDescription className="text-slate-300 mt-1">
-              Add tasks using natural language. For example: "Meeting with John
-              at 3pm for 1 hour, high priority"
-            </DialogDescription>
-          )}
         </DialogHeader>
 
         {processingStep === "input"
