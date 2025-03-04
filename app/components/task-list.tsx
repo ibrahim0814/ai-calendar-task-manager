@@ -11,6 +11,7 @@ interface TaskListProps {
   onDeleteTask: (taskId: string) => Promise<void>
   onEditTask: (taskId: string) => void
   onViewTask: (taskId: string) => void
+  isLoading?: boolean
 }
 
 export default function TaskList({ tasks, onDeleteTask, onEditTask, onViewTask }: TaskListProps) {

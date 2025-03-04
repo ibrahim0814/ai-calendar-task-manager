@@ -6,6 +6,7 @@ export const taskExtractSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   duration: z.number().min(15).max(480),
   priority: z.enum(["high", "medium", "low"]),
+  date: z.date().optional(), // Optional date field for scheduling
 });
 
 export type TaskExtract = z.infer<typeof taskExtractSchema>;

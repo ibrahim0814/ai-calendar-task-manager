@@ -80,21 +80,22 @@ export async function POST(req: NextRequest) {
           content: `You are a helpful assistant that extracts tasks from user input.
           Extract the following information for each task mentioned:
           - title: (REQUIRED) The title of the task
-          - description: (OPTIONAL) A description of the task
           - startTime: (REQUIRED) The start time in HH:MM format (24h). Please use only 15-minute increments (00, 15, 30, 45)
           - duration: (REQUIRED) The duration in minutes (must be a number between 15 and 480)
           - priority: (REQUIRED) The priority level (must be exactly "high", "medium", or "low")
           
-          IMPORTANT: All fields except description are REQUIRED. Always include a numeric duration.
-          If duration is not specified, use a reasonable default based on the task type (30-60 minutes).
-          For start times, always round to the nearest 15-minute increment (00, 15, 30, or 45 minutes).
+          IMPORTANT: 
+          - DO NOT include descriptions in your output. Only extract titles.
+          - All fields are REQUIRED. Always include a numeric duration.
+          - If duration is not specified, use a reasonable default based on the task type (30-60 minutes).
+          - For start times, always round to the nearest 15-minute increment (00, 15, 30, or 45 minutes).
+          
           Format your response as a JSON object with a "tasks" array containing the extracted tasks.
           For example:
           {
             "tasks": [
               {
                 "title": "Team meeting",
-                "description": "Weekly sync with the team",
                 "startTime": "09:00",
                 "duration": 60,
                 "priority": "high"
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
         // Apply defaults and clean up task data
         const processedTask = {
           title: task.title || "Untitled Task",
-          description: task.description || "",
+          description: "", // Initialize with empty string - no automatic description
           startTime: roundToNearest15Minutes(task.startTime || "12:00"), // Round to nearest 15 min
           duration: typeof task.duration === 'number' ? task.duration : 30, // Default 30 minutes
           priority: ["high", "medium", "low"].includes(task.priority) ? task.priority : "medium"

@@ -17,10 +17,13 @@ import {
   CheckCircle,
   Edit as EditIcon,
   Check,
+  Columns,
+  ListTodo,
 } from "lucide-react";
 import { TaskExtract } from "../../lib/types";
 import { Badge } from "./ui/badge";
-import { formatTime, formatDuration } from "../utils/date-utils";
+import { formatTime, formatDuration, getTodayDateString, getTomorrowDateString, formatShortDate } from "../utils/date-utils";
+import { isSameDay, addDays } from "date-fns";
 import { Input } from "./ui/input";
 import {
   Select,
@@ -30,7 +33,10 @@ import {
   SelectValue,
 } from "./ui/select";
 import { DateTimePicker } from "./ui/date-time-picker";
+import { Calendar as CalendarComponent } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Label } from "./ui/label";
+import TaskDayView from "./task-day-view";
 
 interface NaturalLanguageModalProps {
   onClose: () => void;
@@ -48,8 +54,11 @@ export default function NaturalLanguageModal({
   const [processingStep, setProcessingStep] = useState<
     "input" | "confirmation"
   >("input");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date()); // Today as default
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleExtractTasks = useCallback(
     async (e: React.FormEvent) => {
@@ -191,36 +200,357 @@ export default function NaturalLanguageModal({
     }
   }, []);
 
-  const parseTimeFrom12Hour = useCallback((time12h: string) => {
-    const [timePart, ampm] = time12h.split(" ");
-    const [hours, minutes] = timePart.split(":");
-    let hour = parseInt(hours, 10);
+  // Input step rendering
+  const renderInputStep = () => (
+    <form onSubmit={handleExtractTasks}>
+      <div className="grid gap-4 py-4">
+        <Textarea
+          placeholder=""
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          className="min-h-[150px] resize-none"
+          disabled={loading}
+        />
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+      </div>
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={loading}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            "Extract Tasks"
+          )}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
 
-    if (ampm.toUpperCase() === "PM" && hour < 12) {
-      hour += 12;
-    }
-    if (ampm.toUpperCase() === "AM" && hour === 12) {
-      hour = 0;
-    }
+  // Task list rendering
+  const renderTaskList = () => (
+    <div className="space-y-4 max-h-[60vh] sm:max-h-[400px] overflow-y-auto mb-4">
+      {extractedTasks.map((task, index) => (
+        <div
+          key={index}
+          className="p-4 border border-slate-700 rounded-md shadow-sm bg-slate-900 text-white"
+        >
+          <div className="flex justify-between items-start mb-2">
+            {editingTaskIndex === index ? (
+              <div className="w-full">
+                <Input
+                  value={task.title}
+                  onChange={(e) => updateTaskField(index, "title", e.target.value)}
+                  className="mb-2 bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+            ) : (
+              <h3 className="font-medium text-lg text-white">
+                {task.title}
+              </h3>
+            )}
 
-    return `${hour.toString().padStart(2, "0")}:${minutes}`;
+            {editingTaskIndex === index ? (
+              <div className="flex space-x-1 ml-2">
+                {priorityOptions.map((option) => (
+                  <Badge
+                    key={option.value}
+                    className={`${
+                      option.color
+                    } cursor-pointer transition-all ${
+                      task.priority === option.value
+                        ? "scale-110 border border-white"
+                        : "opacity-70"
+                    }`}
+                    onClick={() => {
+                      updateTaskField(index, "priority", option.value);
+                    }}
+                  >
+                    {option.label}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <Badge
+                className={`${getPriorityColor(
+                  task.priority
+                )} cursor-pointer`}
+                onClick={() => setEditingTaskIndex(index)}
+              >
+                {task.priority.toLowerCase()}
+              </Badge>
+            )}
+          </div>
+
+          {editingTaskIndex === index ? (
+            <Textarea
+              value={task.description || ""}
+              onChange={(e) => updateTaskField(index, "description", e.target.value)}
+              placeholder="Add a description (optional)"
+              className="mb-2 bg-slate-800 border-slate-700 text-white text-sm resize-none h-20"
+            />
+          ) : task.description ? (
+            <p className="text-slate-300 mb-2 text-sm">
+              {task.description}
+            </p>
+          ) : null}
+
+          <div className="flex items-center text-sm text-slate-300 gap-3">
+            {editingTaskIndex === index ? (
+              <div className="flex items-center justify-between w-full gap-2 p-2 bg-slate-800/50 rounded-md">
+                <div className="flex flex-wrap items-start gap-3 w-full">
+                  <div className="flex flex-col gap-2">
+                    <div className="inline-flex items-center">
+                      <DateTimePicker
+                        value={task.startTime}
+                        onChange={(newTime) =>
+                          updateTaskField(index, "startTime", newTime)
+                        }
+                        className="w-[140px] h-8 bg-slate-700 border-slate-600 text-white text-sm"
+                      />
+                    </div>
+                    
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="h-7 bg-slate-700 border-slate-600 text-white text-xs w-[140px] flex justify-between items-center"
+                        >
+                          <Calendar className="h-3 w-3 mr-1" />
+                          <span>
+                            {task.date ? formatShortDate(task.date) : 
+                              (selectedDate ? formatShortDate(selectedDate) : 'Today')}
+                          </span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={task.date || selectedDate || undefined}
+                          onSelect={(date) => date && updateTaskField(index, "date", date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="inline-flex items-center">
+                    <Select
+                      value={task.duration.toString()}
+                      onValueChange={(value) =>
+                        updateTaskField(
+                          index,
+                          "duration",
+                          parseInt(value)
+                        )
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-[100px] bg-slate-700 border-slate-600 text-white text-sm">
+                        <SelectValue placeholder="Duration" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700">
+                        {[15, 30, 45, 60, 90, 120, 180, 240].map(
+                          (mins) => (
+                            <SelectItem
+                              key={mins}
+                              value={mins.toString()}
+                            >
+                              {mins} min
+                              {mins > 60
+                                ? ` (${Math.floor(mins / 60)}h${
+                                    mins % 60 ? ` ${mins % 60}m` : ""
+                                  })`
+                                : ""}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="ml-auto">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditingTaskIndex(null)}
+                      className="h-7 w-7 p-0 rounded-full bg-slate-700 hover:bg-slate-600"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="flex items-center cursor-pointer hover:text-white"
+                  onClick={() => setEditingTaskIndex(index)}
+                >
+                  <Clock className="h-4 w-4 mr-1" />
+                  {formatTimeForDisplay(task.startTime)}
+                </div>
+                <div
+                  className="flex items-center cursor-pointer hover:text-white"
+                  onClick={() => setEditingTaskIndex(index)}
+                >
+                  <Calendar className="h-4 w-4 mr-1" />
+                  {formatDuration(task.duration)}
+                </div>
+                {task.date && !isSameDay(task.date, new Date()) && (
+                  <div className="flex items-center text-blue-400">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    {formatShortDate(task.date)}
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditingTaskIndex(index)}
+                  className="h-6 w-6 p-0 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  <EditIcon className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Function to update the date for all tasks
+  const updateAllTaskDates = useCallback((date: Date) => {
+    setExtractedTasks((prevTasks) => {
+      return prevTasks.map(task => ({
+        ...task,
+        date: date
+      }));
+    });
+    setSelectedDate(date);
   }, []);
 
-  const get12HourFormat = useCallback((hour24: number) => {
-    const ampm = hour24 >= 12 ? "PM" : "AM";
-    const hour12 = hour24 % 12 || 12; // Convert 0 to 12
-    return { hour12, ampm };
-  }, []);
+  // Confirmation step rendering
+  const renderConfirmationStep = () => (
+    <div className="py-4 flex flex-col">
+      {/* Date and view toggle buttons */}
+      <div className="flex items-center justify-between mb-4">
+        {/* Date selection buttons */}
+        <div className="flex items-center space-x-2">
+          <div className="text-sm text-slate-400 mr-1">Schedule for:</div>
+          <Button
+            variant={selectedDate && isSameDay(selectedDate, new Date()) ? "default" : "outline"}
+            size="sm"
+            onClick={() => updateAllTaskDates(new Date())}
+            className="text-xs h-8"
+          >
+            Today ({getTodayDateString()})
+          </Button>
+          <Button
+            variant={selectedDate && isSameDay(selectedDate, addDays(new Date(), 1)) ? "default" : "outline"}
+            size="sm"
+            onClick={() => updateAllTaskDates(addDays(new Date(), 1))}
+            className="text-xs h-8"
+          >
+            Tomorrow ({getTomorrowDateString()})
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs h-8 flex items-center gap-1"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                {selectedDate && !isSameDay(selectedDate, new Date()) && 
+                 !isSameDay(selectedDate, addDays(new Date(), 1)) ? 
+                  formatShortDate(selectedDate) : 'Custom'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={selectedDate || undefined}
+                onSelect={(date) => date && updateAllTaskDates(date)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
 
-  const convertTo24Hour = useCallback((hour12: number, ampm: string) => {
-    if (ampm === "PM" && hour12 < 12) {
-      return hour12 + 12;
-    }
-    if (ampm === "AM" && hour12 === 12) {
-      return 0;
-    }
-    return hour12;
-  }, []);
+        {/* View toggle buttons */}
+        <div className="bg-slate-800 rounded-lg p-1 flex">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 w-8 p-0 ${viewMode === 'list' ? 'bg-slate-700' : ''}`}
+            onClick={() => setViewMode('list')}
+            title="List View"
+          >
+            <ListTodo className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 w-8 p-0 ${viewMode === 'calendar' ? 'bg-slate-700' : ''}`}
+            onClick={() => setViewMode('calendar')}
+            title="Calendar View"
+          >
+            <Columns className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      
+      {/* Task display - calendar or list */}
+      {viewMode === 'calendar' 
+        ? <TaskDayView tasks={extractedTasks} updateTaskField={updateTaskField} />
+        : renderTaskList()
+      }
+      
+      {/* Error message */}
+      {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+      
+      {/* Footer buttons */}
+      <DialogFooter className="mt-2 flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setProcessingStep("input")}
+          disabled={loading}
+          className="w-full sm:w-auto"
+        >
+          Back
+        </Button>
+        <Button
+          type="button"
+          onClick={handleAddToCalendar}
+          disabled={loading || isAddingToCalendar}
+          className="w-full sm:w-auto"
+        >
+          {isAddingToCalendar ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Adding to Calendar...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Add to Calendar
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
@@ -233,216 +563,10 @@ export default function NaturalLanguageModal({
           </DialogTitle>
         </DialogHeader>
 
-        {processingStep === "input" ? (
-          <form onSubmit={handleExtractTasks}>
-            <div className="grid gap-4 py-4">
-              <Textarea
-                placeholder=""
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                className="min-h-[150px] resize-none"
-                disabled={loading}
-              />
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  "Extract Tasks"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        ) : (
-          <div className="py-4 flex flex-col">
-            <div className="space-y-4 max-h-[60vh] sm:max-h-[400px] overflow-y-auto mb-4">
-              {extractedTasks.map((task, index) => (
-                <div
-                  key={index}
-                  className="p-4 border border-slate-700 rounded-md shadow-sm bg-slate-900 text-white"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-lg text-white">
-                      {task.title}
-                    </h3>
-
-                    {editingTaskIndex === index ? (
-                      <div className="flex space-x-1">
-                        {priorityOptions.map((option) => (
-                          <Badge
-                            key={option.value}
-                            className={`${
-                              option.color
-                            } cursor-pointer transition-all ${
-                              task.priority === option.value
-                                ? "scale-110 border border-white"
-                                : "opacity-70"
-                            }`}
-                            onClick={() => {
-                              updateTaskField(index, "priority", option.value);
-                              // Uncomment if you want clicking to exit edit mode
-                              // setEditingTaskIndex(null);
-                            }}
-                          >
-                            {option.label}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <Badge
-                        className={`${getPriorityColor(
-                          task.priority
-                        )} cursor-pointer`}
-                        onClick={() => setEditingTaskIndex(index)}
-                      >
-                        {task.priority.toLowerCase()}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {task.description && (
-                    <p className="text-slate-300 mb-2 text-sm">
-                      {task.description}
-                    </p>
-                  )}
-
-                  <div className="flex items-center text-sm text-slate-300 gap-3">
-                    {editingTaskIndex === index ? (
-                      <div className="flex items-center justify-between w-full gap-2 p-2 bg-slate-800/50 rounded-md">
-                        <div className="flex flex-wrap items-center gap-3 w-full">
-                          <div className="inline-flex items-center">
-                            <DateTimePicker
-                              value={task.startTime}
-                              onChange={(newTime) =>
-                                updateTaskField(index, "startTime", newTime)
-                              }
-                              className="w-[140px] h-8 bg-slate-700 border-slate-600 text-white text-sm"
-                            />
-                          </div>
-
-                          <div className="inline-flex items-center">
-                            <Select
-                              value={task.duration.toString()}
-                              onValueChange={(value) =>
-                                updateTaskField(
-                                  index,
-                                  "duration",
-                                  parseInt(value)
-                                )
-                              }
-                            >
-                              <SelectTrigger className="h-8 w-[100px] bg-slate-700 border-slate-600 text-white text-sm">
-                                <SelectValue placeholder="Duration" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-slate-800 border-slate-700">
-                                {[15, 30, 45, 60, 90, 120, 180, 240].map(
-                                  (mins) => (
-                                    <SelectItem
-                                      key={mins}
-                                      value={mins.toString()}
-                                    >
-                                      {mins} min
-                                      {mins > 60
-                                        ? ` (${Math.floor(mins / 60)}h${
-                                            mins % 60 ? ` ${mins % 60}m` : ""
-                                          })`
-                                        : ""}
-                                    </SelectItem>
-                                  )
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="ml-auto">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setEditingTaskIndex(null)}
-                              className="h-7 w-7 p-0 rounded-full bg-slate-700 hover:bg-slate-600"
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div
-                          className="flex items-center cursor-pointer hover:text-white"
-                          onClick={() => setEditingTaskIndex(index)}
-                        >
-                          <Clock className="h-4 w-4 mr-1" />
-                          {formatTimeForDisplay(task.startTime)}
-                        </div>
-                        <div
-                          className="flex items-center cursor-pointer hover:text-white"
-                          onClick={() => setEditingTaskIndex(index)}
-                        >
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {formatDuration(task.duration)}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingTaskIndex(index)}
-                          className="h-6 w-6 p-0 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
-                        >
-                          <EditIcon className="h-3 w-3" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-
-            <DialogFooter className="mt-2 flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setProcessingStep("input")}
-                disabled={loading}
-                className="w-full sm:w-auto"
-              >
-                Back
-              </Button>
-              <Button
-                type="button"
-                onClick={handleAddToCalendar}
-                disabled={loading || isAddingToCalendar}
-                className="w-full sm:w-auto"
-              >
-                {isAddingToCalendar ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding to Calendar...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Add to Calendar
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </div>
-        )}
+        {processingStep === "input" 
+          ? renderInputStep() 
+          : renderConfirmationStep()
+        }
       </DialogContent>
     </Dialog>
   );

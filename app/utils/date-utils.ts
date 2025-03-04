@@ -2,7 +2,7 @@
  * Date and time utility functions for formatting and manipulating dates.
  */
 
-import { format, formatISO, parseISO } from 'date-fns';
+import { format, formatISO, parseISO, addDays } from 'date-fns';
 
 /**
  * Formats a time string in HH:MM format to a more readable format
@@ -57,4 +57,30 @@ export function formatDuration(minutes: number): string {
   } else {
     return `${hours} hour${hours !== 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
   }
+}
+
+/**
+ * Get formatted string for tomorrow's date
+ * @returns String representing tomorrow's date in "MMM d" format (e.g., "Mar 15")
+ */
+export function getTomorrowDateString(): string {
+  const tomorrow = addDays(new Date(), 1);
+  return format(tomorrow, 'MMM d');
+}
+
+/**
+ * Get formatted string for today's date
+ * @returns String representing today's date in "MMM d" format (e.g., "Mar 14")
+ */
+export function getTodayDateString(): string {
+  return format(new Date(), 'MMM d');
+}
+
+/**
+ * Format a Date object to a short readable format
+ * @param date Date object
+ * @returns Formatted date string (e.g., "Mar 14")
+ */
+export function formatShortDate(date: Date): string {
+  return format(date, 'MMM d');
 }

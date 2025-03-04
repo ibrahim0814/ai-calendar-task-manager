@@ -16,6 +16,7 @@ import {
 import { useAuth } from "./providers/auth-provider";
 import { signOut } from "next-auth/react";
 import { Task, TaskExtract } from "@/lib/types";
+import { addDays, isSameDay } from "date-fns";
 import ProtectedRoute from "./components/protected-route";
 import TaskModal from "./components/task-modal";
 import TaskDetailsModal from "./components/task-details-modal";
@@ -26,7 +27,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
-import { format, addHours } from "date-fns";
+import { format } from "date-fns";
+import { createPacificTimeDate } from "../lib/utils";
 import Image from "next/image";
 
 function HomePage() {
@@ -120,81 +122,58 @@ function HomePage() {
   const handleMonthChange = (month: number, year: number) => {
     setCurrentMonth(month);
     setCurrentYear(year);
-
-    // Set the selected date to the first day of the new month
-    const firstDayOfMonth = new Date(year, month, 1);
-    setSelectedDate(firstDayOfMonth);
   };
 
-  // Handle creating or editing a task
-  const handleProcessTasks = useCallback(
-    async (task: any) => {
-      console.log("--------- PROCESSING INDIVIDUAL TASK ---------");
-      console.log("Task data for creation/update:", JSON.stringify(task));
-
+  // Handle create task
+  const handleCreateTask = async (task: Omit<Task, "id">) => {
+    try {
+      console.log("Creating task:", task);
       setLoading(true);
 
-      // Store original overflow value to restore it later
-      const originalOverflow = document.body.style.overflow;
-      
-      // Prevent scrolling issues during task creation
-      document.body.style.overflow = "hidden";
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(task),
+      });
 
-      try {
-        console.log("Sending request to /api/tasks endpoint");
-        const isEditing = !!task.id;
-
-        const endpoint = isEditing ? `/api/tasks?id=${task.id}` : "/api/tasks";
-
-        const method = isEditing ? "PUT" : "POST";
-
-        console.log(`Sending ${method} request to ${endpoint}`);
-        const response = await fetch(endpoint, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(task),
-        });
-
-        console.log("API response status:", response.status);
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error("API error response:", JSON.stringify(errorData));
-          throw new Error("Failed to process task");
-        }
-
-        const responseData = await response.json().catch(() => ({}));
-        console.log("Task created successfully:", JSON.stringify(responseData));
-
-        // Refresh tasks after creation/editing
-        console.log("Refreshing tasks for month");
-        await fetchTasksForMonth(currentMonth, currentYear);
-        
-        console.log("Tasks refreshed successfully, re-enabling UI");
-      } catch (error) {
-        console.error("Error processing task:", error);
-      } finally {
-        console.log("Task processing completed, resetting UI state");
-        
-        // Use a small timeout to ensure UI updates properly before enabling interaction
-        setTimeout(() => {
-          setLoading(false);
-          // Re-enable scrolling
-          document.body.style.overflow = originalOverflow;
-          console.log("UI fully restored");
-        }, 100);
+      if (!response.ok) {
+        throw new Error("Failed to create task");
       }
-    },
-    [currentMonth, currentYear, fetchTasksForMonth]
-  );
 
-  // Fix timezone offset issue
+      const createdTask = await response.json();
+      console.log("Task created successfully:", createdTask);
+
+      // Update the tasks list with the newly created task
+      setTasks((prevTasks) => [...prevTasks, createdTask]);
+
+      // Close the modal
+      setIsModalOpen(false);
+      setTaskToEdit(null);
+
+      // Refresh the tasks for the current month
+      await fetchTasksForMonth(currentMonth, currentYear);
+      
+      return createdTask;
+    } catch (error) {
+      console.error("Error creating task:", error);
+      throw error;
+    } finally {
+      // Make sure we always reset loading state and restore overflow
+      setLoading(false);
+      // Re-enable scrolling if it was disabled
+      if (document.body.style.overflow === "hidden") {
+        document.body.style.overflow = "";
+      }
+    }
+  };
+
+  // This function is no longer needed since we're using createPacificTimeDate
+  // Keeping a simplified version for backward compatibility
   const fixTimezoneOffset = (dateString: string) => {
     const date = new Date(dateString);
-    // Add 8 hours to correct PST timezone
-    return addHours(date, 8);
+    return date;
   };
 
   // Function to delete a task that syncs with Google Calendar
@@ -238,7 +217,7 @@ function HomePage() {
   };
 
   const defaultEndTime = (date: Date) => {
-    return addHours(date, 1);
+    return addDays(date, 1);
   };
 
   // Handle creating a task from natural language
@@ -246,42 +225,59 @@ function HomePage() {
     async (task: TaskExtract) => {
       console.log("Creating task from natural language extract:", task);
 
-      // Start loading state
-      setLoading(true);
-
       try {
-        // Calculate start and end times from startTime string and duration
+        // Apply the selected date to the task if provided
+        const taskDate = task.date || new Date();
+        
+        // Create dates based on the scheduled date and the provided time
         const [hours, minutes] = task.startTime.split(":").map(Number);
-        const startDate = new Date();
-        startDate.setHours(hours, minutes, 0, 0);
-
-        const endDate = new Date(startDate);
-        endDate.setMinutes(endDate.getMinutes() + task.duration);
-
-        // Fix timezone offsets
-        const fixedStartTime = fixTimezoneOffset(startDate.toISOString());
-        const fixedEndTime = fixTimezoneOffset(endDate.toISOString());
-
+        const taskStartDate = new Date(taskDate);
+        taskStartDate.setHours(hours, minutes, 0, 0);
+        
+        const taskEndDate = new Date(taskStartDate);
+        taskEndDate.setMinutes(taskStartDate.getMinutes() + task.duration);
+        
+        console.log(`Creating task: ${task.title}, date: ${taskDate.toISOString()}`);
+        console.log(`Start time: ${taskStartDate.toISOString()}, end time: ${taskEndDate.toISOString()}`);
+        
         const newTask = {
           title: task.title,
           description: task.description || "",
-          startTime: fixedStartTime.toISOString(),
-          endTime: fixedEndTime.toISOString(),
+          startTime: taskStartDate.toISOString(),
+          endTime: taskEndDate.toISOString(),
           priority: task.priority || "medium",
+          date: taskDate.toISOString().split('T')[0], // Store just the date part
         };
 
-        console.log("Prepared task with fixed times:", newTask);
+        console.log("Prepared task:", newTask);
 
-        // Create the task
-        await handleProcessTasks(newTask);
+        // Call API directly instead of using handleCreateTask
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(newTask),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create task");
+        }
+
+        const createdTask = await response.json();
+        console.log("Task created successfully:", createdTask);
+
+        // Update the tasks list with the newly created task
+        setTasks((prevTasks) => [...prevTasks, createdTask]);
 
         console.log("Task successfully created from natural language input");
+        return createdTask;
       } catch (error) {
         console.error("Error creating task from natural language:", error);
-        // Don't set loading to false here, as handleProcessTasks will handle that
+        throw error;
       }
     },
-    [fixTimezoneOffset, handleProcessTasks]
+    [setTasks]
   );
 
   // Handle tasks from natural language extraction
@@ -299,15 +295,25 @@ function HomePage() {
       setLoading(true);
 
       try {
-        // Process each task sequentially
-        for (const task of extractedTasks) {
-          await handleCreateTaskFromNL(task);
-        }
+        // Create array of promises to create all tasks in parallel
+        const taskPromises = extractedTasks.map(task => 
+          handleCreateTaskFromNL(task).catch(err => {
+            console.error(`Failed to create task: ${task.title}`, err);
+            return null;
+          })
+        );
+        
+        // Wait for all tasks to be created
+        const results = await Promise.all(taskPromises);
+        const createdTasks = results.filter(Boolean);
 
         console.log(
-          `Successfully created ${extractedTasks.length} tasks from extracted data`
+          `Successfully created ${createdTasks.length} tasks from extracted data`
         );
 
+        // Refresh tasks for the current month
+        await fetchTasksForMonth(currentMonth, currentYear);
+        
         // Close the natural language modal
         setIsNaturalLanguageModalOpen(false);
       } catch (error) {
@@ -322,7 +328,7 @@ function HomePage() {
         }, 100);
       }
     },
-    [handleCreateTaskFromNL, setIsNaturalLanguageModalOpen]
+    [handleCreateTaskFromNL, setIsNaturalLanguageModalOpen, fetchTasksForMonth, currentMonth, currentYear]
   );
 
   return (
@@ -421,72 +427,50 @@ function HomePage() {
             />
           </div>
 
-          <div className="w-full md:w-1/3 md:pl-4 h-full flex flex-col">
-            <div className="bg-slate-900 rounded-lg p-4 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium text-slate-200">Tasks</h2>
-                <span className="text-sm text-slate-400">{formattedDate}</span>
-              </div>
+          <div className="w-full md:w-1/3 md:border-l md:border-slate-800 md:pl-4 h-full overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">{formattedDate}</h2>
+            </div>
 
-              <div className="overflow-y-auto flex-grow">
-                {loading ? (
-                  <div className="flex justify-center my-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                  </div>
-                ) : tasksForSelectedDate.length > 0 ? (
-                  <TaskList
-                    tasks={tasksForSelectedDate}
-                    onDeleteTask={handleDeleteTask}
-                    onEditTask={handleEditTask}
-                    onViewTask={handleViewTaskDetails}
-                  />
-                ) : (
-                  <div className="text-gray-500 text-center my-8">
-                    No tasks scheduled for this day
-                  </div>
-                )}
-              </div>
+            <div className="overflow-y-auto h-full">
+              <TaskList
+                tasks={tasksForSelectedDate}
+                onDeleteTask={handleDeleteTask}
+                onEditTask={handleEditTask}
+                onViewTask={handleViewTaskDetails}
+                isLoading={loading}
+              />
             </div>
           </div>
         </main>
 
-        {/* Natural Language Modal */}
-        {isNaturalLanguageModalOpen && (
-          <NaturalLanguageModal
-            onClose={() => {
-              console.log("Closing natural language modal");
-              setIsNaturalLanguageModalOpen(false);
-            }}
-            onCreateTasks={handleCreateTasksFromExtract}
-          />
-        )}
-
-        {/* Task Create/Edit Modal */}
+        {/* Task Modal */}
         {isModalOpen && (
           <TaskModal
             onClose={() => {
-              console.log("Closing task modal");
               setIsModalOpen(false);
               setTaskToEdit(null);
             }}
-            onCreateTask={handleProcessTasks}
+            onCreateTask={handleCreateTask}
             taskToEdit={taskToEdit}
           />
         )}
 
+        {/* Natural Language Modal */}
+        {isNaturalLanguageModalOpen && (
+          <NaturalLanguageModal
+            onClose={() => setIsNaturalLanguageModalOpen(false)}
+            onCreateTasks={handleCreateTasksFromExtract}
+          />
+        )}
+
+        {/* Task Details Modal */}
         {viewTaskDetails && (
           <TaskDetailsModal
             task={viewTaskDetails}
             onClose={() => setViewTaskDetails(null)}
-            onEdit={() => {
-              setTaskToEdit(viewTaskDetails);
-              setViewTaskDetails(null);
-              setIsModalOpen(true);
-            }}
-            onDelete={() => {
-              handleDeleteTask(viewTaskDetails.id);
-              setViewTaskDetails(null);
-            }}
+            onDelete={handleDeleteTask}
+            onEdit={handleEditTask}
           />
         )}
       </div>
