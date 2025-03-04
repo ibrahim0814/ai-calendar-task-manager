@@ -40,7 +40,28 @@ export async function GET(req: NextRequest) {
 
     // Check if user is authenticated
     if (!session?.accessToken) {
-      return new NextResponse(JSON.stringify({ message: "Unauthorized" }), {
+      console.error("No access token available - redirect to auth page");
+      return new NextResponse(JSON.stringify({ 
+        message: "Unauthorized", 
+        redirect: true,
+        redirectUrl: "/auth"
+      }), {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
+    
+    // Check if session has an error
+    if (session.error) {
+      console.error("Session has error:", session.error);
+      return new NextResponse(JSON.stringify({ 
+        message: "Session error", 
+        error: session.error,
+        redirect: true,
+        redirectUrl: "/auth"
+      }), {
         status: 401,
         headers: {
           "Content-Type": "application/json",

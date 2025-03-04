@@ -162,88 +162,128 @@ export default function TaskModal({
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] w-[95vw]">
+      <DialogContent className="sm:max-w-[600px] w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{dialogState.title}</DialogTitle>
-          <DialogDescription>{dialogState.description}</DialogDescription>
+          <DialogTitle className="text-xl font-semibold">{dialogState.title}</DialogTitle>
+          <DialogDescription className="text-slate-300">{dialogState.description}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-5 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title" className="text-sm font-medium text-slate-300">Title</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Task title"
+              className="bg-slate-800 border-slate-700 text-white"
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className="text-sm font-medium text-slate-300">Description</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Add details about your task"
-              className="resize-none"
+              className="resize-none bg-slate-800 border-slate-700 text-white min-h-[100px]"
             />
           </div>
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="start-time">Start Time</Label>
+                <Label htmlFor="start-time" className="text-sm font-medium text-slate-300">Start Time</Label>
                 <Input
                   id="start-time"
                   type="datetime-local"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full"
+                  className="w-full bg-slate-800 border-slate-700 text-white h-11"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="end-time">End Time</Label>
+                <Label htmlFor="end-time" className="text-sm font-medium text-slate-300">End Time</Label>
                 <Input
                   id="end-time"
                   type="datetime-local"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full"
+                  className="w-full bg-slate-800 border-slate-700 text-white h-11"
                 />
               </div>
             </div>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="priority">Priority</Label>
+            <Label htmlFor="priority" className="text-sm font-medium text-slate-300">Priority</Label>
             <Select
               value={priority}
               onValueChange={(value) =>
                 setPriority(value as "high" | "medium" | "low")
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-11">
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
+              <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                <SelectItem value="low" className="hover:bg-slate-700">Low</SelectItem>
+                <SelectItem value="medium" className="hover:bg-slate-700">Medium</SelectItem>
+                <SelectItem value="high" className="hover:bg-slate-700">High</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {error && (
+            <div className="text-red-400 text-sm mt-1">{error}</div>
+          )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2" />
-                Processing...
-              </div>
-            ) : (
-              dialogState.buttonText
-            )}
-          </Button>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-2 mt-2">
+          {/* Mobile order: Submit first, then Cancel */}
+          <div className="flex flex-col sm:hidden w-full gap-2">
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isSubmitting}
+              className="h-11"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center justify-center w-full">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2" />
+                  Processing...
+                </div>
+              ) : (
+                dialogState.buttonText
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+              className="h-11"
+            >
+              Cancel
+            </Button>
+          </div>
+          
+          {/* Desktop order: Cancel first, then Submit */}
+          <div className="hidden sm:flex sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+              className="flex-auto h-10"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isSubmitting}
+              className="flex-auto h-10"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center justify-center w-full">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2" />
+                  Processing...
+                </div>
+              ) : (
+                dialogState.buttonText
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

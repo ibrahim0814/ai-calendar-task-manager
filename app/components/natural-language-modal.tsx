@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -64,11 +65,32 @@ export default function NaturalLanguageModal({
   const [processingStep, setProcessingStep] = useState<
     "input" | "confirmation"
   >("input");
+  // Always default to list view
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date()); // Today as default
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Helper function to sort tasks by time
+  const sortTasksByTime = useCallback((tasks: TaskExtract[]) => {
+    return [...tasks].sort((a, b) => {
+      // Sort by time (HH:MM format)
+      const timeA = a.startTime;
+      const timeB = b.startTime;
+
+      // Compare hours first
+      const [hoursA, minutesA] = timeA.split(":").map(Number);
+      const [hoursB, minutesB] = timeB.split(":").map(Number);
+
+      if (hoursA !== hoursB) {
+        return hoursA - hoursB;
+      }
+
+      // If hours are the same, compare minutes
+      return minutesA - minutesB;
+    });
+  }, []);
 
   const handleExtractTasks = useCallback(
     async (e: React.FormEvent) => {
@@ -136,7 +158,14 @@ export default function NaturalLanguageModal({
           )
         );
 
-        setExtractedTasks(processedTasks);
+        // Sort tasks by time when initially extracted
+        const sortedTasks = sortTasksByTime(processedTasks);
+
+        // Reset view mode to list (default)
+        setViewMode("list");
+
+        // Set tasks and move to confirmation step
+        setExtractedTasks(sortedTasks);
         setProcessingStep("confirmation");
       } catch (err) {
         console.error("Error extracting tasks:", err);
@@ -147,7 +176,7 @@ export default function NaturalLanguageModal({
         setLoading(false);
       }
     },
-    [text]
+    [text, sortTasksByTime]
   );
 
   const handleAddToCalendar = useCallback(async () => {
@@ -213,15 +242,22 @@ export default function NaturalLanguageModal({
   const updateTaskField = useCallback(
     (index: number, field: keyof TaskExtract, value: any) => {
       setExtractedTasks((prev) => {
+        // Create updated tasks array
         const updated = [...prev];
         updated[index] = {
           ...updated[index],
           [field]: value,
         };
+
+        // Sort tasks by time if we're updating the startTime field
+        if (field === "startTime") {
+          return sortTasksByTime(updated);
+        }
+
         return updated;
       });
     },
-    []
+    [sortTasksByTime]
   );
 
   const formatTimeForDisplay = useCallback((timeString: string) => {
@@ -250,25 +286,52 @@ export default function NaturalLanguageModal({
         />
         {error && <p className="text-red-500 text-sm">{error}</p>}
       </div>
-      <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={loading}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            "Extract Tasks"
-          )}
-        </Button>
+      <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+        {/* Mobile order: Submit first, then Cancel */}
+        <div className="flex flex-col sm:hidden w-full gap-2">
+          <Button type="submit" disabled={loading} className="h-11">
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </div>
+            ) : (
+              "Extract Tasks"
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+            className="h-11"
+          >
+            Cancel
+          </Button>
+        </div>
+
+        {/* Desktop order: Cancel first, then Submit */}
+        <div className="hidden sm:flex sm:flex-row gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+            className="h-10"
+          >
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading} className="h-10">
+            {loading ? (
+              <div className="flex items-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </div>
+            ) : (
+              "Extract Tasks"
+            )}
+          </Button>
+        </div>
       </DialogFooter>
     </form>
   );
@@ -592,18 +655,18 @@ export default function NaturalLanguageModal({
           type="button"
           onClick={handleAddToCalendar}
           disabled={loading || isAddingToCalendar}
-          className="w-full"
+          className="w-full h-11"
         >
           {isAddingToCalendar ? (
-            <>
+            <div className="flex items-center justify-center">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Adding to Calendar...
-            </>
+            </div>
           ) : (
-            <>
+            <div className="flex items-center justify-center">
               <CheckCircle className="mr-2 h-4 w-4" />
               Add to Calendar
-            </>
+            </div>
           )}
         </Button>
         <Button
@@ -611,7 +674,7 @@ export default function NaturalLanguageModal({
           variant="outline"
           onClick={() => setProcessingStep("input")}
           disabled={loading}
-          className="w-full"
+          className="w-full h-11"
         >
           Back
         </Button>
@@ -715,34 +778,68 @@ export default function NaturalLanguageModal({
       {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
 
       {/* Footer buttons */}
-      <DialogFooter className="mt-2 flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setProcessingStep("input")}
-          disabled={loading}
-          className="w-full sm:w-auto"
-        >
-          Back
-        </Button>
-        <Button
-          type="button"
-          onClick={handleAddToCalendar}
-          disabled={loading || isAddingToCalendar}
-          className="w-full sm:w-auto"
-        >
-          {isAddingToCalendar ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Adding to Calendar...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Add to Calendar
-            </>
-          )}
-        </Button>
+      <DialogFooter className="mt-2 flex flex-col sm:flex-row gap-2 sm:gap-2">
+        {/* Mobile order: Primary action first, then Back */}
+        <div className="flex flex-col sm:hidden w-full gap-2">
+          <Button
+            type="button"
+            onClick={handleAddToCalendar}
+            disabled={loading || isAddingToCalendar}
+            className="h-11"
+          >
+            {isAddingToCalendar ? (
+              <div className="flex items-center justify-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding to Calendar...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Add to Calendar
+              </div>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setProcessingStep("input")}
+            disabled={loading}
+            className="h-11"
+          >
+            Back
+          </Button>
+        </div>
+
+        {/* Desktop order: Back first, then Primary action */}
+        <div className="hidden sm:flex sm:flex-row gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setProcessingStep("input")}
+            disabled={loading}
+            className="h-10"
+          >
+            Back
+          </Button>
+          <Button
+            type="button"
+            onClick={handleAddToCalendar}
+            disabled={loading || isAddingToCalendar}
+            className="h-10"
+          >
+            {isAddingToCalendar ? (
+              <div className="flex items-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding to Calendar...
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Add to Calendar
+              </div>
+            )}
+          </Button>
+        </div>
       </DialogFooter>
     </div>
   );
@@ -764,9 +861,15 @@ export default function NaturalLanguageModal({
         }`}
       >
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-xl font-semibold">
             {processingStep === "input" ? "Quick Add Tasks" : "Confirm Tasks"}
           </DialogTitle>
+          {processingStep === "input" && (
+            <DialogDescription className="text-slate-300 mt-1">
+              Add tasks using natural language. For example: "Meeting with John
+              at 3pm for 1 hour, high priority"
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         {processingStep === "input"

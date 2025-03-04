@@ -86,6 +86,11 @@ const CalendarDay = memo(
                   : "bg-blue-900"
               }`}
               title={task.title}
+              onClick={(e) => {
+                // Only prevent the event from bubbling up to the day container
+                // This allows task clicks but prevents tab switching
+                e.stopPropagation();
+              }}
             >
               {task.startTime && (
                 <span className="mr-1">{formatTime(task.startTime)}</span>
@@ -94,7 +99,13 @@ const CalendarDay = memo(
             </div>
           ))}
           {dayTasks.length > 3 && (
-            <div className="text-xs text-slate-400 p-1">
+            <div 
+              className="text-xs text-slate-400 p-1"
+              onClick={(e) => {
+                // Prevent event bubbling to avoid tab switching on task clicks
+                e.stopPropagation();
+              }}
+            >
               +{dayTasks.length - 3} more
             </div>
           )}

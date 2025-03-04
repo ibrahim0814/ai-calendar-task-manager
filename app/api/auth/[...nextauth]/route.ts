@@ -55,11 +55,42 @@ const handler = NextAuth({
       }
 
       // Access token has expired, try to update it
-      console.log("JWT Callback - Token expired, needs refresh");
-      return {
-        ...token,
-        error: "RefreshTokenRequired"
-      };
+      console.log("JWT Callback - Token expired, attempting refresh");
+      try {
+        const response = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: process.env.GOOGLE_CLIENT_ID || "",
+            client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+            grant_type: "refresh_token",
+            refresh_token: token.refreshToken as string,
+          }),
+        });
+
+        const refreshedTokens = await response.json();
+        
+        if (!response.ok) {
+          console.error("Failed to refresh token:", refreshedTokens);
+          return {
+            ...token,
+            error: "RefreshAccessTokenError",
+          };
+        }
+
+        console.log("Token refreshed successfully");
+        return {
+          ...token,
+          accessToken: refreshedTokens.access_token,
+          accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
+        };
+      } catch (error) {
+        console.error("Error refreshing token:", error);
+        return {
+          ...token,
+          error: "RefreshAccessTokenError",
+        };
+      }
     },
     async session({ session, token }) {
       console.log("Session Callback - token exists:", !!token);

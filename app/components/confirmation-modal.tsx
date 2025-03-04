@@ -34,33 +34,65 @@ export default function ConfirmationModal({
 }: ConfirmationModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] w-[95vw]">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
+          <DialogDescription className="text-slate-300 mt-2">{description}</DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex space-x-2 justify-end">
-          <Button
-            variant="outline"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
-            {cancelLabel}
-          </Button>
-          <Button 
-            variant="destructive" 
-            onClick={onConfirm}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2" />
-                Processing...
-              </div>
-            ) : (
-              confirmLabel
-            )}
-          </Button>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-2 mt-4">
+          {/* Mobile order: Confirm first, then Cancel */}
+          <div className="flex flex-col sm:hidden w-full gap-2">
+            <Button 
+              variant="destructive" 
+              onClick={onConfirm}
+              disabled={isLoading}
+              className="h-11"
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center w-full">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2" />
+                  Processing...
+                </div>
+              ) : (
+                confirmLabel
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              disabled={isLoading}
+              className="h-11"
+            >
+              {cancelLabel}
+            </Button>
+          </div>
+          
+          {/* Desktop order: Cancel first, then Confirm */}
+          <div className="hidden sm:flex sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              disabled={isLoading}
+              className="sm:flex-none h-10"
+            >
+              {cancelLabel}
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={onConfirm}
+              disabled={isLoading}
+              className="sm:flex-none h-10"
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center w-full">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2" />
+                  Processing...
+                </div>
+              ) : (
+                confirmLabel
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -27,7 +27,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Log the response status for debugging
         console.log("AuthProvider - User API response status:", authState);
 
-        if (authState.isAuthenticated && authState.user) {
+        if (authState.error) {
+          console.error("AuthProvider - Session error detected:", authState.error);
+          setError(new Error(`Session error: ${authState.error}`));
+          setUser(null);
+          // The redirect will be handled in getCurrentUser
+        } else if (authState.isAuthenticated && authState.user) {
           console.log("AuthProvider - User data loaded:", !!authState.user);
           setUser(authState.user);
         } else {
@@ -54,8 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }, 10000); // 10 second timeout
 
-    return () => clearTimeout(timeout);
-  }, []);
+    // Set up periodic token check (every 5 minutes)
+    const tokenCheckInterval = setInterval(() => {
+      console.log("AuthProvider - Performing periodic token check");
+      loadUserFromAPI();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(tokenCheckInterval);
+    };
+  }, [loading]);
 
   return (
     <AuthContext.Provider value={{ user, loading, error }}>

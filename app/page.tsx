@@ -38,6 +38,7 @@ function HomePage() {
   const isMobile = useIsMobile();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  // Single state for active tab
   const [activeTab, setActiveTab] = useState<'tasks' | 'calendar'>('tasks');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNaturalLanguageModalOpen, setIsNaturalLanguageModalOpen] =
@@ -98,12 +99,20 @@ function HomePage() {
         }
 
         const res = await fetch(`/api/tasks?month=${month}&year=${year}`);
+        const data = await res.json();
 
         if (!res.ok) {
+          console.error("Error response from tasks API:", data);
+          
+          // Check if we got a redirect response
+          if (data.redirect && data.redirectUrl) {
+            console.log("Session expired, redirecting to:", data.redirectUrl);
+            window.location.href = data.redirectUrl;
+            return;
+          }
+          
           throw new Error(`Error fetching tasks: ${res.status}`);
         }
-
-        const data = await res.json();
 
         // Apply timezone correction to each task's times
         const tasksWithCorrectedTime = data.map((task: Task) => ({
@@ -134,12 +143,9 @@ function HomePage() {
     }
   }, [currentMonth, currentYear, user, fetchTasksForMonth]);
   
-  // When a date is selected on the calendar view, switch to the tasks tab on mobile
-  useEffect(() => {
-    if (isMobile && selectedDate) {
-      setActiveTab('tasks');
-    }
-  }, [selectedDate, isMobile]);
+  // Only switch to tasks tab on mobile when a date is explicitly selected
+  // We've removed the automatic switch to preserve drag-and-drop functionality
+  // This was causing issues with the calendar view redirecting on task click
 
   // Handle month change from calendar
   const handleMonthChange = (month: number, year: number) => {
@@ -147,7 +153,7 @@ function HomePage() {
     setCurrentYear(year);
   };
   
-  // Handle tab change
+  // Simple tab change handler
   const handleTabChange = (tab: 'tasks' | 'calendar') => {
     setActiveTab(tab);
   };
@@ -231,13 +237,16 @@ function HomePage() {
     }
   };
 
-  // Handle edit task functionality - now using natural language instead of modal
+  // Handle updating a task is now defined above handleTaskTimeUpdate
+  // to properly initialize it for the useCallback dependencies
+
+  // Handle edit task functionality
   const handleEditTask = (taskId: string) => {
     const taskToEdit = tasks.find((t) => t.id === taskId);
     if (taskToEdit) {
       setTaskToEdit(taskToEdit);
-      // Open natural language modal instead of manual modal
-      setIsNaturalLanguageModalOpen(true);
+      // Open task modal for editing
+      setIsModalOpen(true);
     }
   };
 
@@ -370,6 +379,55 @@ function HomePage() {
       currentYear,
     ]
   );
+
+  // Handle updating a task - simplifying to avoid complexity
+  const handleUpdateTask = async (updatedTask: Omit<Task, "id"> & { id?: string }) => {
+    try {
+      console.log("Updating task:", updatedTask);
+      
+      setLoading(true);
+      
+      // Ensure we have the task ID
+      if (!updatedTask.id) {
+        throw new Error("Task ID is required for updates");
+      }
+      
+      const response = await fetch(`/api/tasks`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedTask),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to update task");
+      }
+      
+      const result = await response.json();
+      console.log("Task updated successfully:", result);
+      
+      // Update the tasks list
+      setTasks(prevTasks => prevTasks.map(task => 
+        task.id === updatedTask.id ? {...task, ...updatedTask} : task
+      ));
+      
+      // Close the modal
+      setTaskToEdit(null);
+      setIsModalOpen(false);
+      
+      // Refresh tasks
+      await fetchTasksForMonth(currentMonth, currentYear);
+      
+    } catch (error) {
+      console.error("Error updating task:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // We're removing the task time update handler since it's not needed for this fix
 
   return (
     <ProtectedRoute>
@@ -510,16 +568,19 @@ function HomePage() {
                 ) : (
                   /* Calendar Tab */
                   <div className="h-full calendar-tab-content">
-                    <CalendarView
-                      tasks={tasks}
-                      onDateSelect={(date) => {
-                        setSelectedDate(date);
-                        // When selecting a date on mobile, switch to tasks tab
-                        setActiveTab('tasks');
-                      }}
-                      selectedDate={selectedDate}
-                      onMonthChange={handleMonthChange}
-                    />
+                    {/* Completely isolated calendar view for mobile to prevent any tab issues */}
+                    <div className="h-full">
+                      <CalendarView
+                        tasks={tasks}
+                        onDateSelect={(date) => {
+                          // Just set the selected date with no side effects
+                          // Note: We NEVER call setActiveTab here - that's the key fix!
+                          setSelectedDate(date);
+                        }}
+                        selectedDate={selectedDate}
+                        onMonthChange={handleMonthChange}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -567,7 +628,17 @@ function HomePage() {
           )}
         </main>
 
-        {/* Task Modal */}
+        {/* Task Modal - For creating and editing tasks */}
+        {isModalOpen && (
+          <TaskModal
+            onClose={() => {
+              setIsModalOpen(false);
+              setTaskToEdit(null);
+            }}
+            onCreateTask={taskToEdit ? handleUpdateTask : handleCreateTask}
+            taskToEdit={taskToEdit}
+          />
+        )}
 
         {/* Natural Language Modal */}
         {isNaturalLanguageModalOpen && (
@@ -577,7 +648,7 @@ function HomePage() {
               setTaskToEdit(null);
             }}
             onCreateTasks={handleCreateTasksFromExtract}
-            taskToEdit={taskToEdit}
+            taskToEdit={null}
           />
         )}
 
@@ -594,5 +665,7 @@ function HomePage() {
     </ProtectedRoute>
   );
 }
+
+// Calendar task updating has been integrated directly into handleUpdateTask with the skipTabSwitch parameter
 
 export default HomePage;
