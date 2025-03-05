@@ -27,7 +27,7 @@ export function formatTime(timeString: string): string {
  */
 export function formatDate(dateString: string): string {
   // If it's in HH:MM format (for start times), format as time
-  if (/^\d{2}:\d{2}$/.test(dateString)) {
+  if (typeof dateString === 'string' && /^\d{1,2}:\d{2}$/.test(dateString)) {
     return formatTime(dateString);
   }
   
@@ -78,9 +78,27 @@ export function getTodayDateString(): string {
 
 /**
  * Format a Date object to a short readable format
- * @param date Date object
+ * @param date Date object or date string
  * @returns Formatted date string (e.g., "Mar 14")
  */
-export function formatShortDate(date: Date): string {
-  return format(date, 'MMM d');
+export function formatShortDate(date: Date | string | null | undefined): string {
+  if (!date) {
+    return format(new Date(), 'MMM d'); // Default to today
+  }
+  
+  try {
+    // If it's a string, try to convert to a Date
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date provided to formatShortDate:', date);
+      return format(new Date(), 'MMM d'); // Default to today
+    }
+    
+    return format(dateObj, 'MMM d');
+  } catch (e) {
+    console.error('Error formatting date in formatShortDate:', e);
+    return format(new Date(), 'MMM d'); // Default to today
+  }
 }

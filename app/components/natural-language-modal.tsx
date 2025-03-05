@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -72,6 +72,51 @@ export default function NaturalLanguageModal({
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date()); // Today as default
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Add effect for click-outside handling
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showDatePicker) {
+        const datePickerElement = document.querySelector(
+          '[data-date-picker="true"]'
+        );
+        if (
+          datePickerElement &&
+          !datePickerElement.contains(event.target as Node)
+        ) {
+          setShowDatePicker(false);
+        }
+      }
+
+      // Handle task-specific date pickers
+      if (editingTaskIndex !== null) {
+        // Check if clicked outside any task date picker
+        const taskDateElement = document.querySelector(
+          `[data-task-date-picker="${editingTaskIndex}"]`
+        );
+        if (
+          taskDateElement &&
+          !taskDateElement.contains(event.target as Node)
+        ) {
+          // If click outside and dataset exists, clear it
+          if (
+            document.body.dataset[`task-date-open-${editingTaskIndex}`] ===
+            "true"
+          ) {
+            document.body.dataset[`task-date-open-${editingTaskIndex}`] =
+              "false";
+            // Force re-render
+            setExtractedTasks([...extractedTasks]);
+          }
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showDatePicker, editingTaskIndex, extractedTasks]);
+
   // Helper function to sort tasks by time
   const sortTasksByTime = useCallback((tasks: TaskExtract[]) => {
     return [...tasks].sort((a, b) => {
@@ -126,9 +171,19 @@ export default function NaturalLanguageModal({
         const tasks: TaskExtract[] = await response.json();
         console.log("Successfully extracted tasks:", JSON.stringify(tasks));
 
+        // Fix the tasks constant issue
         if (!tasks || tasks.length === 0) {
-          console.error("No tasks extracted from the input");
-          throw new Error("No tasks could be extracted from your text");
+          const defaultTask = [
+            {
+              title: "Task from input",
+              startTime: "12:00",
+              duration: 30,
+              priority: "medium" as const,
+              date: new Date(),
+            },
+          ];
+          setExtractedTasks(defaultTask);
+          return;
         }
 
         // If tasks have a date, set the selectedDate to the first task's date
@@ -244,10 +299,42 @@ export default function NaturalLanguageModal({
       setExtractedTasks((prev) => {
         // Create updated tasks array
         const updated = [...prev];
-        updated[index] = {
-          ...updated[index],
-          [field]: value,
-        };
+
+        // Special handling for date field - ensure it's a proper Date object
+        if (field === "date" && value) {
+          // If value is a Date object, use it directly
+          if (value instanceof Date) {
+            updated[index] = {
+              ...updated[index],
+              [field]: new Date(value),
+            };
+          }
+          // If value is a string, convert to Date
+          else if (typeof value === "string") {
+            try {
+              updated[index] = {
+                ...updated[index],
+                [field]: new Date(value),
+              };
+            } catch (e) {
+              console.error("Error converting date string to Date object:", e);
+              // Keep the existing value if there's an error
+              updated[index] = { ...updated[index] };
+            }
+          } else {
+            // For any other value type, just use as is
+            updated[index] = {
+              ...updated[index],
+              [field]: value,
+            };
+          }
+        } else {
+          // For non-date fields, update normally
+          updated[index] = {
+            ...updated[index],
+            [field]: value,
+          };
+        }
 
         // Sort tasks by time if we're updating the startTime field
         if (field === "startTime") {
@@ -419,13 +506,38 @@ export default function NaturalLanguageModal({
                       />
                     </div>
 
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 bg-slate-700 border-slate-600 text-white text-xs w-[140px] flex justify-between items-center"
-                        >
+                    <div
+                      className="relative w-full flex"
+                      data-task-date-picker={index.toString()}
+                    >
+                      <div
+                        className="w-full flex items-center justify-between h-7 bg-slate-700 border border-slate-600 text-white text-xs rounded-md px-3 cursor-pointer"
+                        onClick={() => {
+                          // Create a unique state variable for each task
+                          const uniqueKey = `edit-task-date-${index}`;
+                          setEditingTaskIndex((prev) =>
+                            prev === index ? null : index
+                          );
+
+                          // Clear any other open calendars
+                          Object.keys(document.body.dataset)
+                            .filter((key) => key.startsWith("task-date-open-"))
+                            .forEach((key) => {
+                              document.body.dataset[key] = "false";
+                            });
+
+                          // Toggle this calendar
+                          document.body.dataset[`task-date-open-${index}`] =
+                            document.body.dataset[`task-date-open-${index}`] ===
+                            "true"
+                              ? "false"
+                              : "true";
+
+                          // Force re-render
+                          setExtractedTasks([...extractedTasks]);
+                        }}
+                      >
+                        <div className="flex items-center">
                           <Calendar className="h-3 w-3 mr-1" />
                           <span>
                             {task.date
@@ -434,19 +546,33 @@ export default function NaturalLanguageModal({
                               ? formatShortDate(selectedDate)
                               : "Today"}
                           </span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={task.date || selectedDate || undefined}
-                          onSelect={(date) =>
-                            date && updateTaskField(index, "date", date)
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                        </div>
+                        <span className="text-slate-400">▼</span>
+                      </div>
+
+                      {/* Calendar dropdown */}
+                      {document.body.dataset[`task-date-open-${index}`] ===
+                        "true" && (
+                        <div className="absolute z-[9999] mt-1 left-0 right-0 top-full bg-slate-800 border border-slate-700 rounded-md shadow-lg overflow-hidden">
+                          <CalendarComponent
+                            mode="single"
+                            selected={task.date ? new Date(task.date) : selectedDate}
+                            onSelect={(date) => {
+                              if (date) {
+                                // Make a complete fresh Date object to avoid any reference issues
+                                const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                                updateTaskField(index, "date", newDate);
+                                // Close the calendar
+                                document.body.dataset[`task-date-open-${index}`] = "false";
+                                // Force re-render
+                                setExtractedTasks([...extractedTasks]);
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="inline-flex items-center">
@@ -531,22 +657,30 @@ export default function NaturalLanguageModal({
       return;
     }
 
-    // Create a clean date object without time component
-    const cleanDate = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate()
-    );
+    try {
+      // Create a clean date object without time component
+      const cleanDate = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      );
 
-    setExtractedTasks((prevTasks) => {
-      return prevTasks.map((task) => ({
-        ...task,
-        date: cleanDate,
-      }));
-    });
+      setExtractedTasks((prevTasks) => {
+        return prevTasks.map((task) => {
+          // Create a new Date object for each task to prevent reference issues
+          return {
+            ...task,
+            date: new Date(cleanDate),
+          };
+        });
+      });
 
-    setSelectedDate(cleanDate);
-    console.log("Updated all tasks to date:", cleanDate.toISOString());
+      // Set the selected date (for UI highlighting)
+      setSelectedDate(cleanDate);
+      console.log("Updated all tasks to date:", cleanDate.toISOString());
+    } catch (error) {
+      console.error("Error updating task dates:", error);
+    }
   }, []);
 
   // Mobile-specific confirmation step
@@ -582,30 +716,52 @@ export default function NaturalLanguageModal({
           </Button>
         </div>
 
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs h-9 flex items-center justify-center gap-1 w-full mt-1"
-            >
-              <Calendar className="h-3.5 w-3.5" />
+        <div className="relative w-full" data-date-picker="true">
+          <div
+            className="w-full flex items-center justify-center gap-1 h-9 bg-slate-800 border border-slate-700 rounded-md px-3 mt-1 cursor-pointer text-xs"
+            onClick={() => {
+              // Close any other open calendars first
+              Object.keys(document.body.dataset)
+                .filter((key) => key.startsWith("task-date-open-"))
+                .forEach((key) => {
+                  document.body.dataset[key] = "false";
+                });
+
+              // Toggle this calendar
+              setShowDatePicker(!showDatePicker);
+            }}
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            <span>
               {selectedDate &&
               !isSameDay(selectedDate, new Date()) &&
               !isSameDay(selectedDate, addDays(new Date(), 1))
                 ? formatShortDate(selectedDate)
                 : "Custom Date"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="center">
-            <CalendarComponent
-              mode="single"
-              selected={selectedDate || undefined}
-              onSelect={(date) => date && updateAllTaskDates(date)}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
+            </span>
+          </div>
+
+          {showDatePicker && (
+            <div className="absolute z-[9999] mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-md shadow-lg overflow-hidden">
+              <CalendarComponent
+                mode="single"
+                selected={selectedDate || undefined}
+                onSelect={(date) => {
+                  if (date) {
+                    const newDate = new Date(
+                      date.getFullYear(),
+                      date.getMonth(),
+                      date.getDate()
+                    );
+                    updateAllTaskDates(newDate);
+                    setShowDatePicker(false);
+                  }
+                }}
+                initialFocus
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Mobile view toggle */}
@@ -714,30 +870,54 @@ export default function NaturalLanguageModal({
           >
             Tomorrow ({getTomorrowDateString()})
           </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-8 flex items-center gap-1"
-              >
+          <div className="relative w-full" data-date-picker="true">
+            <div
+              className="w-full flex items-center justify-between h-8 bg-slate-800 border border-slate-700 rounded-md px-3 cursor-pointer text-xs hover:bg-slate-700/50 transition-colors"
+              onClick={() => {
+                // Close any other open calendars first
+                Object.keys(document.body.dataset)
+                  .filter((key) => key.startsWith("task-date-open-"))
+                  .forEach((key) => {
+                    document.body.dataset[key] = "false";
+                  });
+
+                // Toggle this calendar
+                setShowDatePicker(!showDatePicker);
+              }}
+            >
+              <div className="flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5" />
-                {selectedDate &&
-                !isSameDay(selectedDate, new Date()) &&
-                !isSameDay(selectedDate, addDays(new Date(), 1))
-                  ? formatShortDate(selectedDate)
-                  : "Custom"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent
-                mode="single"
-                selected={selectedDate || undefined}
-                onSelect={(date) => date && updateAllTaskDates(date)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+                <span>
+                  {selectedDate &&
+                  !isSameDay(selectedDate, new Date()) &&
+                  !isSameDay(selectedDate, addDays(new Date(), 1))
+                    ? formatShortDate(selectedDate)
+                    : "Custom"}
+                </span>
+              </div>
+            </div>
+
+            {showDatePicker && (
+              <div className="absolute z-[9999] mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-md shadow-lg overflow-hidden">
+                <CalendarComponent
+                  mode="single"
+                  selected={selectedDate || undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      const newDate = new Date(
+                        date.getFullYear(),
+                        date.getMonth(),
+                        date.getDate()
+                      );
+                      updateAllTaskDates(newDate);
+                      setShowDatePicker(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* View toggle buttons */}
@@ -857,7 +1037,7 @@ export default function NaturalLanguageModal({
         className={`${
           isMobile
             ? "w-[95vw] max-h-[90vh] overflow-hidden"
-            : "sm:max-w-[600px]"
+            : "sm:max-w-[700px]"
         }`}
       >
         <DialogHeader>

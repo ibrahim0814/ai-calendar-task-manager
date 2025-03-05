@@ -85,6 +85,7 @@ export function DateTimePicker({
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           className={cn(
             "w-full justify-start text-left font-normal",
@@ -108,7 +109,7 @@ export function DateTimePicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
+      <PopoverContent className="w-auto p-0 bg-slate-800 border-slate-700" style={{ zIndex: 9999 }}>
         <div className="sm:flex">
           {showDate && (
             <Calendar
@@ -118,19 +119,20 @@ export function DateTimePicker({
               initialFocus
             />
           )}
-          <div className="flex flex-col sm:flex-row sm:h-[300px] divide-y sm:divide-y-0 sm:divide-x">
+          <div className="flex flex-col sm:flex-row sm:h-[300px] divide-y sm:divide-y-0 sm:divide-x divide-slate-700">
             <ScrollArea className="w-64 sm:w-auto">
               <div className="flex sm:flex-col p-2">
                 {hours.map((hour) => (
                   <Button
                     key={hour}
+                    type="button"
                     size="icon"
                     variant={
                       date && date.getHours() % 12 === hour % 12
                         ? "default"
                         : "ghost"
                     }
-                    className="sm:w-full shrink-0 aspect-square"
+                    className="sm:w-full shrink-0 aspect-square text-white hover:bg-slate-700"
                     onClick={() => handleTimeChange("hour", hour.toString())}
                   >
                     {hour}
@@ -144,11 +146,12 @@ export function DateTimePicker({
                 {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
                   <Button
                     key={minute}
+                    type="button"
                     size="icon"
                     variant={
                       date && date.getMinutes() === minute ? "default" : "ghost"
                     }
-                    className="sm:w-full shrink-0 aspect-square"
+                    className="sm:w-full shrink-0 aspect-square text-white hover:bg-slate-700"
                     onClick={() =>
                       handleTimeChange("minute", minute.toString())
                     }
@@ -164,6 +167,7 @@ export function DateTimePicker({
                 {["AM", "PM"].map((ampm) => (
                   <Button
                     key={ampm}
+                    type="button"
                     size="icon"
                     variant={
                       date &&
@@ -172,7 +176,7 @@ export function DateTimePicker({
                         ? "default"
                         : "ghost"
                     }
-                    className="sm:w-full shrink-0 aspect-square"
+                    className="sm:w-full shrink-0 aspect-square text-white hover:bg-slate-700"
                     onClick={() => handleTimeChange("ampm", ampm)}
                   >
                     {ampm}
