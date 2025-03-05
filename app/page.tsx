@@ -18,7 +18,14 @@ import { useAuth } from "./providers/auth-provider";
 import { useIsMobile } from "./hooks/use-mobile";
 import { signOut } from "next-auth/react";
 import { Task, TaskExtract } from "@/lib/types";
-import { addDays, isSameDay, getDaysInMonth, differenceInDays, endOfMonth, endOfYear } from "date-fns";
+import {
+  addDays,
+  isSameDay,
+  getDaysInMonth,
+  differenceInDays,
+  endOfMonth,
+  endOfYear,
+} from "date-fns";
 import ProtectedRoute from "./components/protected-route";
 import TaskModal from "./components/task-modal";
 import TaskDetailsModal from "./components/task-details-modal";
@@ -30,7 +37,6 @@ import {
   DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { createPacificTimeDate } from "../lib/utils";
 import Image from "next/image";
 
 function HomePage() {
@@ -39,7 +45,7 @@ function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   // Single state for active tab
-  const [activeTab, setActiveTab] = useState<'tasks' | 'calendar'>('tasks');
+  const [activeTab, setActiveTab] = useState<"tasks" | "calendar">("tasks");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNaturalLanguageModalOpen, setIsNaturalLanguageModalOpen] =
     useState(false);
@@ -54,20 +60,20 @@ function HomePage() {
   const formattedDate = useMemo(
     () =>
       selectedDate
-        ? format(selectedDate, "EEEE, MMMM d, yyyy")
-        : format(new Date(), "EEEE, MMMM d, yyyy"),
+        ? format(selectedDate, "EEE, MMMM d, yyyy")
+        : format(new Date(), "EEE, MMMM d, yyyy"),
     [selectedDate]
   );
-  
+
   // Calculate days left in month and year
   const { daysLeftInMonth, daysLeftInYear } = useMemo(() => {
     const today = new Date();
     const monthEnd = endOfMonth(today);
     const yearEnd = endOfYear(today);
-    
+
     return {
       daysLeftInMonth: differenceInDays(monthEnd, today) + 1, // Include today
-      daysLeftInYear: differenceInDays(yearEnd, today) + 1    // Include today
+      daysLeftInYear: differenceInDays(yearEnd, today) + 1, // Include today
     };
   }, []);
 
@@ -103,14 +109,14 @@ function HomePage() {
 
         if (!res.ok) {
           console.error("Error response from tasks API:", data);
-          
+
           // Check if we got a redirect response
           if (data.redirect && data.redirectUrl) {
             console.log("Session expired, redirecting to:", data.redirectUrl);
             window.location.href = data.redirectUrl;
             return;
           }
-          
+
           throw new Error(`Error fetching tasks: ${res.status}`);
         }
 
@@ -142,7 +148,7 @@ function HomePage() {
       fetchTasksForMonth(currentMonth, currentYear);
     }
   }, [currentMonth, currentYear, user, fetchTasksForMonth]);
-  
+
   // Only switch to tasks tab on mobile when a date is explicitly selected
   // We've removed the automatic switch to preserve drag-and-drop functionality
   // This was causing issues with the calendar view redirecting on task click
@@ -152,9 +158,9 @@ function HomePage() {
     setCurrentMonth(month);
     setCurrentYear(year);
   };
-  
+
   // Simple tab change handler
-  const handleTabChange = (tab: 'tasks' | 'calendar') => {
+  const handleTabChange = (tab: "tasks" | "calendar") => {
     setActiveTab(tab);
   };
 
@@ -381,17 +387,19 @@ function HomePage() {
   );
 
   // Handle updating a task - simplifying to avoid complexity
-  const handleUpdateTask = async (updatedTask: Omit<Task, "id"> & { id?: string }) => {
+  const handleUpdateTask = async (
+    updatedTask: Omit<Task, "id"> & { id?: string }
+  ) => {
     try {
       console.log("Updating task:", updatedTask);
-      
+
       setLoading(true);
-      
+
       // Ensure we have the task ID
       if (!updatedTask.id) {
         throw new Error("Task ID is required for updates");
       }
-      
+
       const response = await fetch(`/api/tasks`, {
         method: "PUT",
         headers: {
@@ -399,26 +407,27 @@ function HomePage() {
         },
         body: JSON.stringify(updatedTask),
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to update task");
       }
-      
+
       const result = await response.json();
       console.log("Task updated successfully:", result);
-      
+
       // Update the tasks list
-      setTasks(prevTasks => prevTasks.map(task => 
-        task.id === updatedTask.id ? {...task, ...updatedTask} : task
-      ));
-      
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+        )
+      );
+
       // Close the modal
       setTaskToEdit(null);
       setIsModalOpen(false);
-      
+
       // Refresh tasks
       await fetchTasksForMonth(currentMonth, currentYear);
-      
     } catch (error) {
       console.error("Error updating task:", error);
       throw error;
@@ -501,7 +510,13 @@ function HomePage() {
           </div>
         </header>
 
-        <main className={`p-4 ${isMobile ? 'mobile-container' : 'flex flex-col md:flex-row h-[calc(100vh-74px)] overflow-hidden'}`}>
+        <main
+          className={`p-4 ${
+            isMobile
+              ? "mobile-container"
+              : "flex flex-col md:flex-row h-[calc(100vh-74px)] overflow-hidden"
+          }`}
+        >
           {/* Conditionally render layout based on mobile/desktop */}
           {isMobile ? (
             /* Mobile Layout - Tabbed interface */
@@ -510,51 +525,71 @@ function HomePage() {
               <div className="w-full date-banner">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h2 className="text-lg font-semibold text-white">{format(new Date(), "EEEE, MMMM d")}</h2>
-                    <p className="text-sm text-slate-400">{format(new Date(), "yyyy")}</p>
+                    <h2 className="text-lg font-semibold text-white">
+                      {format(new Date(), "EEE, MMMM d")}
+                    </h2>
+                    <p className="text-sm text-slate-400">
+                      {format(new Date(), "yyyy")}
+                    </p>
                   </div>
                   <div className="flex gap-3 flex-shrink-0">
                     <div className="days-counter counter-month">
-                      <span className="text-blue-400 font-bold">{daysLeftInMonth}</span>
+                      <span className="text-blue-400 font-bold">
+                        {daysLeftInMonth}
+                      </span>
                       <span className="text-slate-400 mt-0.5">days left</span>
-                      <span className="text-slate-400 text-[10px] mt-0.5">in month</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">
+                        in month
+                      </span>
                     </div>
                     <div className="days-counter counter-year">
-                      <span className="text-purple-400 font-bold">{daysLeftInYear}</span>
+                      <span className="text-purple-400 font-bold">
+                        {daysLeftInYear}
+                      </span>
                       <span className="text-slate-400 mt-0.5">days left</span>
-                      <span className="text-slate-400 text-[10px] mt-0.5">in year</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">
+                        in year
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
-              
+
               {/* Tab buttons */}
               <div className="flex w-full mb-4 border-b border-slate-800">
-                <button 
-                  onClick={() => handleTabChange('tasks')}
-                  className={`flex items-center gap-2 px-4 py-2 w-1/2 justify-center ${activeTab === 'tasks' ? 'border-b-2 border-blue-400 text-blue-400 font-medium' : 'text-slate-400'}`}
+                <button
+                  onClick={() => handleTabChange("tasks")}
+                  className={`flex items-center gap-2 px-4 py-2 w-1/2 justify-center ${
+                    activeTab === "tasks"
+                      ? "border-b-2 border-blue-400 text-blue-400 font-medium"
+                      : "text-slate-400"
+                  }`}
                 >
                   <List className="h-4 w-4" />
                   <span>Tasks</span>
                 </button>
-                <button 
-                  onClick={() => handleTabChange('calendar')}
-                  className={`flex items-center gap-2 px-4 py-2 w-1/2 justify-center ${activeTab === 'calendar' ? 'border-b-2 border-blue-400 text-blue-400 font-medium' : 'text-slate-400'}`}
+                <button
+                  onClick={() => handleTabChange("calendar")}
+                  className={`flex items-center gap-2 px-4 py-2 w-1/2 justify-center ${
+                    activeTab === "calendar"
+                      ? "border-b-2 border-blue-400 text-blue-400 font-medium"
+                      : "text-slate-400"
+                  }`}
                 >
                   <CalendarDays className="h-4 w-4" />
                   <span>Calendar</span>
                 </button>
               </div>
-              
+
               {/* Content based on active tab */}
               <div className="w-full flex-1 h-[calc(100vh-200px)] overflow-hidden">
-                {activeTab === 'tasks' ? (
+                {activeTab === "tasks" ? (
                   /* Tasks Tab */
                   <div className="h-full flex flex-col task-tab-content">
                     <div className="flex justify-between items-center mb-3">
                       {/* Removed "Today's Tasks" heading */}
                     </div>
-                    
+
                     <div className="flex-1 rounded-md p-3 bg-slate-900/50">
                       <TaskList
                         tasks={tasksForSelectedDate}
@@ -602,14 +637,22 @@ function HomePage() {
                   <h2 className="text-xl font-semibold">{formattedDate}</h2>
                   <div className="flex gap-3 flex-shrink-0 hidden md:flex">
                     <div className="days-counter counter-month">
-                      <span className="text-blue-400 font-bold">{daysLeftInMonth}</span>
+                      <span className="text-blue-400 font-bold">
+                        {daysLeftInMonth}
+                      </span>
                       <span className="text-slate-400 mt-0.5">days left</span>
-                      <span className="text-slate-400 text-[10px] mt-0.5">in month</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">
+                        in month
+                      </span>
                     </div>
                     <div className="days-counter counter-year">
-                      <span className="text-purple-400 font-bold">{daysLeftInYear}</span>
+                      <span className="text-purple-400 font-bold">
+                        {daysLeftInYear}
+                      </span>
                       <span className="text-slate-400 mt-0.5">days left</span>
-                      <span className="text-slate-400 text-[10px] mt-0.5">in year</span>
+                      <span className="text-slate-400 text-[10px] mt-0.5">
+                        in year
+                      </span>
                     </div>
                   </div>
                 </div>

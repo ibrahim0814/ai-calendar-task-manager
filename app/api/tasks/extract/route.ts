@@ -234,17 +234,26 @@ export async function POST(req: NextRequest) {
         if (typeof task.startTime === 'string') {
           // Try to fix common time format issues
           if (/^\d{1,2}:\d{2}$/.test(task.startTime)) {
-            // Single-digit hour format like "9:00"
-            startTime = task.startTime.padStart(5, '0');
+            // Single-digit hour format like "9:00" - ensure two digits
+            const [hours, minutes] = task.startTime.split(':');
+            startTime = `${hours.padStart(2, '0')}:${minutes}`;
+            console.log(`Formatted time from ${task.startTime} to ${startTime}`);
           } else if (/^\d{1,2}$/.test(task.startTime)) {
             // Just hour like "9"
             startTime = `${task.startTime.padStart(2, '0')}:00`;
+            console.log(`Formatted time from ${task.startTime} to ${startTime}`);
           } else if (/^\d{4}$/.test(task.startTime)) {
             // Military style without colon like "0900"
             startTime = `${task.startTime.substring(0,2)}:${task.startTime.substring(2,4)}`;
-          } else if (task.startTime.match(/^\d{1,2}:\d{2}$/)) {
-            startTime = task.startTime.padStart(5, '0');
+            console.log(`Formatted time from ${task.startTime} to ${startTime}`);
           } else {
+            console.log(`Could not format time ${task.startTime}, using default 12:00`);
+            startTime = "12:00";
+          }
+          
+          // Final verification - ensure the format is exactly two digits, colon, two digits
+          if (!/^\d{2}:\d{2}$/.test(startTime)) {
+            console.warn(`Time format still incorrect: ${startTime}, fixing to 12:00`);
             startTime = "12:00";
           }
         }

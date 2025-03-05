@@ -47,7 +47,14 @@ export default function TaskModal({
   taskToEdit,
 }: TaskModalProps) {
   const [title, setTitle] = useState(taskToEdit?.title || "");
-  const [description, setDescription] = useState(taskToEdit?.description || "");
+  const [description, setDescription] = useState(
+    // Clean the description from any priority markers when displaying to the user
+    taskToEdit?.description
+      ? taskToEdit.description
+          .replace(/\[Priority: (high|medium|low)\]/i, "")
+          .trim()
+      : ""
+  );
 
   // New state variables for date and time components
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -394,9 +401,11 @@ export default function TaskModal({
         endDateTime.setHours(endHours, endMinutes, 0, 0);
 
         console.log("Calling onCreateTask with form data");
+        // The description sent to the server should be the clean description entered by the user
+        // Priority will be added to the description by the server
         const taskData = {
           title,
-          description,
+          description, // Clean description without priority marker
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
           priority,

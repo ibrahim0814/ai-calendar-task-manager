@@ -41,32 +41,38 @@ export async function GET(req: NextRequest) {
     // Check if user is authenticated
     if (!session?.accessToken) {
       console.error("No access token available - redirect to auth page");
-      return new NextResponse(JSON.stringify({ 
-        message: "Unauthorized", 
-        redirect: true,
-        redirectUrl: "/auth"
-      }), {
-        status: 401,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      return new NextResponse(
+        JSON.stringify({
+          message: "Unauthorized",
+          redirect: true,
+          redirectUrl: "/auth",
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
-    
+
     // Check if session has an error
     if (session.error) {
       console.error("Session has error:", session.error);
-      return new NextResponse(JSON.stringify({ 
-        message: "Session error", 
-        error: session.error,
-        redirect: true,
-        redirectUrl: "/auth"
-      }), {
-        status: 401,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      return new NextResponse(
+        JSON.stringify({
+          message: "Session error",
+          error: session.error,
+          redirect: true,
+          redirectUrl: "/auth",
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
 
     // Parse query parameters to get month and year if provided
@@ -133,6 +139,7 @@ export async function GET(req: NextRequest) {
       const formattedEvents = allEvents.map((event) => {
         // Try to extract priority from description
         let priority = "medium"; // Default priority
+        let cleanDescription = event.description || "";
 
         if (event.description) {
           // Check for priority tag in the description
@@ -141,18 +148,18 @@ export async function GET(req: NextRequest) {
           );
           if (priorityMatch && priorityMatch[1]) {
             priority = priorityMatch[1].toLowerCase();
+            // Remove the priority tag from displayed description
+            cleanDescription = event.description
+              .replace(/\[Priority: (high|medium|low)\]/i, "")
+              .replace(/\[Created by AI Calendar Assistant\]/i, "")
+              .trim();
           }
         }
 
         return {
           id: event.id,
           title: event.summary || "Untitled Event",
-          description: event.description
-            ? event.description
-                .replace(/\[Priority: (high|medium|low)\]/i, "") // Remove the priority tag from displayed description
-                .replace(/\[Created by AI Calendar Assistant\]/i, "")
-                .trim()
-            : "",
+          description: cleanDescription,
           startTime: event.start?.dateTime || event.start?.date,
           endTime: event.end?.dateTime || event.end?.date,
           priority: priority,
@@ -448,7 +455,9 @@ export async function PUT(req: NextRequest) {
     // Format the event for Google Calendar
     const event = {
       summary: title,
-      description: `${description || ""}\n\nPriority: ${priority || "medium"}`,
+      description: `${description || ""}\n\n[Priority: ${
+        priority || "medium"
+      }]`,
       start: {
         dateTime: startTime,
         timeZone: "UTC",

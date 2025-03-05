@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -24,7 +23,6 @@ import {
 import { TaskExtract, Task } from "../../lib/types";
 import { Badge } from "./ui/badge";
 import {
-  formatTime,
   formatDuration,
   getTodayDateString,
   getTomorrowDateString,
@@ -39,9 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { DateTimePicker } from "./ui/date-time-picker";
 import { Calendar as CalendarComponent } from "./ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import TaskDayView from "./task-day-view";
 import { useIsMobile } from "../hooks/use-mobile";
 import { TimePicker } from "./ui/time-picker";
@@ -89,56 +85,33 @@ export default function NaturalLanguageModal({
           }
         }
 
-        // Safely handle task-specific date pickers
-        let forceRerender = false;
-        
-        try {
-          // Check if document.body.dataset exists and is valid
-          if (document.body && document.body.dataset) {
-            // Get all keys safely
-            const datasetKeys = Object.keys(document.body.dataset);
-            
-            // Filter keys for open date pickers
-            const openDatePickerKeys = datasetKeys.filter(
-              (key) => 
-                key.startsWith("task-date-open-") && 
-                document.body.dataset[key] === "true"
-            );
-            
-            // Process each open date picker
-            for (const key of openDatePickerKeys) {
-              // Extract the index from the key (task-date-open-X)
-              const indexStr = key.split("-").pop();
-              
-              if (indexStr) {
-                // Find the corresponding date picker element
-                const taskDateElement = document.querySelector(
-                  `[data-task-date-picker="${indexStr}"]`
-                );
+        // Handle task-specific date pickers
+        let hasChanges = false;
 
-                // Check if the click was outside this task date picker
-                if (
-                  taskDateElement &&
-                  !taskDateElement.contains(event.target as Node)
-                ) {
-                  console.log(`Click outside detected for task date picker ${indexStr}`);
-                  
-                  // Close the date picker
-                  document.body.dataset[key] = "false";
-                  forceRerender = true;
-                }
-              }
+        // Loop through all potential task indexes
+        for (let i = 0; i < 20; i++) {
+          // Assuming no more than 20 tasks
+          const taskDatePickerKey = `taskDatePickerOpen-${i}`;
+
+          // Check if this picker is open according to session storage
+          if (sessionStorage.getItem(taskDatePickerKey) === "true") {
+            // Get the element for this task's date picker
+            const taskElement = document.querySelector(`.task-${i}-datepicker`);
+
+            // If we found the element and the click was outside
+            if (taskElement && !taskElement.contains(event.target as Node)) {
+              console.log(`Closing date picker for task ${i}`);
+              sessionStorage.removeItem(taskDatePickerKey);
+              hasChanges = true;
             }
           }
-        } catch (innerError) {
-          console.error("Error handling task date pickers click outside:", innerError);
         }
-          
-        // Only force a re-render if we closed a date picker
-        if (forceRerender) {
-          console.log("Force re-render after click outside");
-          // Force re-render to update UI using a functional update
-          setExtractedTasks(tasks => [...tasks]);
+
+        // Only force re-render if we closed at least one date picker
+        if (hasChanges) {
+          // Force re-render to update UI
+          console.log("Forcing re-render after closing date picker");
+          setExtractedTasks((prev) => [...prev]);
         }
       } catch (error) {
         console.error("Error in click outside handler:", error);
@@ -151,30 +124,14 @@ export default function NaturalLanguageModal({
     };
   }, [showDatePicker]);
 
-  // Initialize task date pickers when tasks change
+  // No need to initialize date pickers anymore - using Popover component
   useEffect(() => {
-    console.log("Initializing task date pickers");
-    
-    // Safety check to prevent errors when array is empty or undefined
+    // This is now just a placeholder for any future task initialization logic
     if (!extractedTasks || !Array.isArray(extractedTasks)) {
-      console.log("No tasks to initialize date pickers for");
       return;
     }
-    
-    try {
-      // Initialize any task date picker states
-      for (let index = 0; index < extractedTasks.length; index++) {
-        // Make sure the data attribute exists for each task
-        const key = `task-date-open-${index}`;
-        if (document.body.dataset[key] === undefined) {
-          document.body.dataset[key] = "false";
-        }
-      }
-    } catch (error) {
-      console.error("Error initializing task date pickers:", error);
-    }
   }, [extractedTasks.length]);
-  
+
   // Helper function to sort tasks by time
   const sortTasksByTime = useCallback((tasks: TaskExtract[]) => {
     try {
@@ -183,37 +140,41 @@ export default function NaturalLanguageModal({
         console.warn("Invalid tasks array passed to sortTasksByTime");
         return [];
       }
-      
+
       return [...tasks].sort((a, b) => {
         try {
           // Ensure startTime properties exist and are valid strings
-          const timeA = typeof a?.startTime === 'string' ? a.startTime : '12:00';
-          const timeB = typeof b?.startTime === 'string' ? b.startTime : '12:00';
-          
+          const timeA =
+            typeof a?.startTime === "string" ? a.startTime : "12:00";
+          const timeB =
+            typeof b?.startTime === "string" ? b.startTime : "12:00";
+
           // Ensure the time strings match the expected format
           const isValidTimeA = /^\d{1,2}:\d{2}$/.test(timeA);
           const isValidTimeB = /^\d{1,2}:\d{2}$/.test(timeB);
-          
+
           if (!isValidTimeA || !isValidTimeB) {
-            console.warn(`Invalid time format: ${!isValidTimeA ? timeA : timeB}`);
+            console.warn(
+              `Invalid time format: ${!isValidTimeA ? timeA : timeB}`
+            );
             return 0; // Don't change order if invalid format
           }
-          
+
           // Parse hours and minutes safely
           let [hoursA, minutesA] = timeA.split(":").map(Number);
           let [hoursB, minutesB] = timeB.split(":").map(Number);
-          
+
           // Validate parsed values
           hoursA = isNaN(hoursA) ? 12 : hoursA;
           minutesA = isNaN(minutesA) ? 0 : minutesA;
           hoursB = isNaN(hoursB) ? 12 : hoursB;
           minutesB = isNaN(minutesB) ? 0 : minutesB;
-          
+
           // Compare hours
           if (hoursA !== hoursB) {
             return hoursA - hoursB;
           }
-          
+
           // If hours are the same, compare minutes
           return minutesA - minutesB;
         } catch (error) {
@@ -258,8 +219,17 @@ export default function NaturalLanguageModal({
           throw new Error(data.error || "Failed to extract tasks");
         }
 
-        const tasks: TaskExtract[] = await response.json();
-        console.log("Successfully extracted tasks:", JSON.stringify(tasks));
+        const rawResponse = await response.text();
+        console.log("Raw API response:", rawResponse);
+
+        let tasks: TaskExtract[];
+        try {
+          tasks = JSON.parse(rawResponse);
+          console.log("Successfully parsed tasks:", JSON.stringify(tasks));
+        } catch (parseError) {
+          console.error("Error parsing tasks JSON:", parseError);
+          throw new Error("The response from the server was not valid JSON");
+        }
 
         // Fix the tasks constant issue
         if (!tasks || tasks.length === 0) {
@@ -279,7 +249,7 @@ export default function NaturalLanguageModal({
         // Set today as default date if none provided
         const today = new Date();
         setSelectedDate(today);
-        
+
         try {
           // If tasks have a date, set the selectedDate to the first task's date
           if (tasks.length > 0 && tasks[0].date) {
@@ -288,15 +258,18 @@ export default function NaturalLanguageModal({
               let taskDate;
               if (tasks[0].date instanceof Date) {
                 taskDate = tasks[0].date;
-              } else if (typeof tasks[0].date === 'string') {
+              } else if (typeof tasks[0].date === "string") {
                 taskDate = new Date(tasks[0].date);
               } else {
                 taskDate = today;
               }
-              
+
               // Verify the date is valid
               if (!isNaN(taskDate.getTime())) {
-                console.log("Setting selected date from extracted task:", taskDate.toISOString());
+                console.log(
+                  "Setting selected date from extracted task:",
+                  taskDate.toISOString()
+                );
                 setSelectedDate(taskDate);
               }
             } catch (dateError) {
@@ -313,7 +286,7 @@ export default function NaturalLanguageModal({
             let taskDate;
             if (task.date instanceof Date && !isNaN(task.date.getTime())) {
               taskDate = task.date;
-            } else if (typeof task.date === 'string') {
+            } else if (typeof task.date === "string") {
               try {
                 const dateObj = new Date(task.date);
                 taskDate = !isNaN(dateObj.getTime()) ? dateObj : undefined;
@@ -323,13 +296,34 @@ export default function NaturalLanguageModal({
             } else {
               taskDate = undefined;
             }
-            
+
+            // Ensure startTime is properly formatted (two digits, colon, two digits)
+            let safeStartTime = "12:00";
+            if (typeof task.startTime === "string") {
+              // Validate or fix the time format
+              if (/^\d{2}:\d{2}$/.test(task.startTime)) {
+                safeStartTime = task.startTime;
+              } else if (/^\d{1,2}:\d{2}$/.test(task.startTime)) {
+                // Fix single-digit hour
+                const [hours, minutes] = task.startTime.split(":");
+                safeStartTime = `${hours.padStart(2, "0")}:${minutes}`;
+                console.log(
+                  `Fixing startTime format in client from ${task.startTime} to ${safeStartTime}`
+                );
+              } else {
+                console.warn(
+                  `Invalid startTime format: ${task.startTime}, using default 12:00`
+                );
+              }
+            }
+
             return {
               ...task,
               date: taskDate,
-              startTime: typeof task.startTime === 'string' ? task.startTime : '12:00',
-              duration: typeof task.duration === 'number' ? task.duration : 30,
-              priority: typeof task.priority === 'string' ? task.priority : 'medium'
+              startTime: safeStartTime,
+              duration: typeof task.duration === "number" ? task.duration : 30,
+              priority:
+                typeof task.priority === "string" ? task.priority : "medium",
             };
           } catch (taskError) {
             console.error("Error processing task:", taskError);
@@ -338,7 +332,7 @@ export default function NaturalLanguageModal({
               title: task.title || "Untitled Task",
               startTime: "12:00",
               duration: 30,
-              priority: "medium" as const
+              priority: "medium" as const,
             };
           }
         });
@@ -396,8 +390,9 @@ export default function NaturalLanguageModal({
 
   const getPriorityColor = useCallback((priority: string | undefined) => {
     // Safely convert priority to lowercase if it exists and is a string
-    const priorityLower = typeof priority === 'string' ? priority.toLowerCase() : '';
-    
+    const priorityLower =
+      typeof priority === "string" ? priority.toLowerCase() : "";
+
     switch (priorityLower) {
       case "high":
         return "bg-red-500/20 text-red-200 hover:bg-red-500/30 border border-red-500/50";
@@ -445,10 +440,14 @@ export default function NaturalLanguageModal({
           try {
             // If value is a Date object, create a new Date object to avoid reference issues
             if (value instanceof Date) {
-              console.log(`Setting date for task ${index} to:`, value.toISOString());
-              
+              console.log(
+                `Setting date for task ${index} to:`,
+                value.toISOString()
+              );
+
               // Ensure the date is valid
               if (!isNaN(value.getTime())) {
+                // Create a new task object with the updated date
                 updated[index] = {
                   ...updated[index],
                   [field]: new Date(
@@ -457,6 +456,14 @@ export default function NaturalLanguageModal({
                     value.getDate()
                   ),
                 };
+
+                // Don't update the selectedDate for individual task updates
+                // This was causing all tasks to appear with the same date
+
+                console.log(
+                  `Updated task ${index} with new date:`,
+                  updated[index].date
+                );
               } else {
                 console.warn("Invalid Date object received:", value);
                 // Keep existing value
@@ -466,7 +473,7 @@ export default function NaturalLanguageModal({
             // If value is a string, try to convert to Date
             else if (typeof value === "string") {
               console.log(`Converting string date for task ${index}:`, value);
-              
+
               try {
                 const dateObj = new Date(value);
                 if (!isNaN(dateObj.getTime())) {
@@ -474,6 +481,9 @@ export default function NaturalLanguageModal({
                     ...updated[index],
                     [field]: dateObj,
                   };
+
+                  // Don't update the selectedDate for individual task updates
+                  // This was causing all tasks to appear with the same date
                 } else {
                   console.error("Invalid date string:", value);
                   // Keep existing value if string can't be parsed
@@ -485,7 +495,10 @@ export default function NaturalLanguageModal({
               }
             } else {
               // For any other value type, just create a copy of the task
-              console.warn(`Unknown date value type for task ${index}:`, typeof value);
+              console.warn(
+                `Unknown date value type for task ${index}:`,
+                typeof value
+              );
               updated[index] = {
                 ...updated[index],
                 [field]: value,
@@ -501,7 +514,7 @@ export default function NaturalLanguageModal({
           try {
             if (typeof value === "string") {
               let timeValue = value;
-              
+
               // Validate time format
               if (!/^\d{1,2}:\d{2}$/.test(timeValue)) {
                 console.warn("Invalid time format for startTime:", timeValue);
@@ -517,7 +530,7 @@ export default function NaturalLanguageModal({
                   return updated;
                 }
               }
-              
+
               // Update with valid time value
               updated[index] = {
                 ...updated[index],
@@ -552,6 +565,32 @@ export default function NaturalLanguageModal({
     [sortTasksByTime]
   );
 
+  // New dedicated function to update an individual task's date
+  const updateIndividualTaskDate = useCallback((index: number, date: Date) => {
+    if (!date || isNaN(date.getTime())) {
+      console.warn("Attempted to update task with an invalid date");
+      return;
+    }
+
+    console.log(`Updating date for task ${index} to:`, date.toISOString());
+
+    setExtractedTasks((prevTasks) => {
+      return prevTasks.map((task, i) => {
+        if (i === index) {
+          // Only update this specific task
+          return {
+            ...task,
+            date: new Date(date.getFullYear(), date.getMonth(), date.getDate()),
+          };
+        }
+        return task;
+      });
+    });
+
+    // Close the date picker for this task
+    sessionStorage.removeItem(`taskDatePickerOpen-${index}`);
+  }, []);
+
   const formatTimeForDisplay = useCallback((timeString: string) => {
     try {
       const [hours, minutes] = timeString.split(":");
@@ -575,6 +614,12 @@ export default function NaturalLanguageModal({
           onChange={(e) => setText(e.target.value)}
           className="min-h-[150px] resize-none"
           disabled={loading}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleExtractTasks(e as unknown as React.FormEvent);
+            }
+          }}
         />
         {error && <p className="text-red-500 text-sm">{error}</p>}
       </div>
@@ -694,12 +739,15 @@ export default function NaturalLanguageModal({
               </div>
             ) : (
               <Badge
-                className={`${getPriorityColor(task.priority || 'medium')} cursor-pointer`}
+                className={`${getPriorityColor(
+                  task.priority || "medium"
+                )} cursor-pointer`}
                 onClick={() => setEditingTaskIndex(index)}
               >
-                {(task.priority && typeof task.priority === 'string')
-                  ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1)
-                  : 'Medium'}
+                {task.priority && typeof task.priority === "string"
+                  ? task.priority.charAt(0).toUpperCase() +
+                    task.priority.slice(1)
+                  : "Medium"}
               </Badge>
             )}
           </div>
@@ -722,91 +770,111 @@ export default function NaturalLanguageModal({
               <div className="flex items-center justify-between w-full gap-2 p-2 bg-slate-800/50 rounded-md">
                 <div className="flex flex-wrap items-start gap-3 w-full">
                   <div className="flex items-center gap-3">
-                    <div className="relative" data-task-date-picker={index}>
+                    <div className={`relative task-${index}-datepicker`}>
+                      {/* Use a simple button with state for toggling date picker */}
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         className="h-8 px-3 bg-slate-700 border-slate-600 text-white text-sm flex items-center gap-2"
-                        onClick={(e) => {
-                          // Prevent propagation to avoid immediate click-outside handling
-                          e.stopPropagation();
-                          
-                          console.log(`Task ${index} date button clicked`);
-                          
-                          try {
-                            // Create a key for this task's date picker
-                            const taskDateOpenKey = `task-date-open-${index}`;
-                            
-                            // Close any other open date pickers
-                            Object.keys(document.body.dataset || {})
-                              .filter(key => 
-                                key.startsWith("task-date-open-") && 
-                                key !== taskDateOpenKey && 
-                                document.body.dataset[key] === "true"
-                              )
-                              .forEach(key => {
-                                document.body.dataset[key] = "false";
-                              });
-                            
-                            // Toggle this calendar state
-                            const currentState = document.body.dataset[taskDateOpenKey] === "true";
-                            document.body.dataset[taskDateOpenKey] = currentState ? "false" : "true";
-                            
-                            console.log(`Task ${index} calendar toggled to: ${!currentState}`);
-                            
-                            // Force re-render
-                            setExtractedTasks(tasks => [...tasks]);
-                          } catch (error) {
-                            console.error("Error toggling calendar:", error);
+                        onClick={() => {
+                          // Create a temporary state variable for this task's showDatePicker
+                          const taskIndexToToggle = `taskDatePickerOpen-${index}`;
+                          const isCurrentlyOpen =
+                            sessionStorage.getItem(taskIndexToToggle) ===
+                            "true";
+
+                          // Close all other date pickers
+                          for (let i = 0; i < extractedTasks.length; i++) {
+                            if (i !== index) {
+                              sessionStorage.removeItem(
+                                `taskDatePickerOpen-${i}`
+                              );
+                            }
                           }
+
+                          // Toggle this one
+                          if (isCurrentlyOpen) {
+                            sessionStorage.removeItem(taskIndexToToggle);
+                          } else {
+                            sessionStorage.setItem(taskIndexToToggle, "true");
+                          }
+
+                          // Force re-render
+                          setExtractedTasks([...extractedTasks]);
+
+                          console.log(`Toggled date picker for task ${index}`);
                         }}
                       >
                         <Calendar className="h-4 w-4" />
                         <span>
-                          {task.date
+                          {task.date instanceof Date
                             ? formatShortDate(task.date)
-                            : selectedDate
+                            : selectedDate instanceof Date
                             ? formatShortDate(selectedDate)
                             : "Today"}
                         </span>
                       </Button>
 
-                      {document.body.dataset[`task-date-open-${index}`] === "true" && (
-                        <div 
-                          className="fixed inset-0 bg-black/20 z-40"
-                          onClick={() => {
-                            document.body.dataset[`task-date-open-${index}`] = "false";
-                            setExtractedTasks((tasks) => [...tasks]);
-                          }}
-                        >
-                          <div 
-                            className="absolute mt-1 left-1/2 top-1/4 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-md shadow-xl z-50" 
-                            onClick={(e) => e.stopPropagation()}
-                            style={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.9)" }}
-                          >
-                            <h3 className="px-3 py-2 border-b border-slate-700 text-sm font-medium">Select Date</h3>
+                      {/* Check session storage for this task's date picker state */}
+                      {sessionStorage.getItem(`taskDatePickerOpen-${index}`) ===
+                        "true" && (
+                        <div className="absolute z-50 mt-1">
+                          <div className="p-0 bg-slate-800 border border-slate-700 rounded-md shadow-lg">
+                            <h3 className="px-3 py-2 border-b border-slate-700 text-sm font-medium text-white flex items-center justify-between">
+                              <span>Select Date for Task</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full"
+                                onClick={() => {
+                                  sessionStorage.removeItem(
+                                    `taskDatePickerOpen-${index}`
+                                  );
+                                  setExtractedTasks([...extractedTasks]);
+                                }}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M18 6 6 18"></path>
+                                  <path d="m6 6 12 12"></path>
+                                </svg>
+                              </Button>
+                            </h3>
                             <CalendarComponent
                               mode="single"
-                              selected={task.date || selectedDate || undefined}
+                              selected={
+                                task.date instanceof Date
+                                  ? task.date
+                                  : undefined
+                              }
                               onSelect={(date) => {
                                 if (!date) return;
-                                
-                                console.log(`Calendar date selected for task ${index}:`, date);
-                                const newDate = new Date(
-                                  date.getFullYear(),
-                                  date.getMonth(),
-                                  date.getDate()
+
+                                console.log(
+                                  `Calendar date selected:`,
+                                  date.toISOString()
                                 );
-                                
-                                // Update the task's date
-                                updateTaskField(index, "date", newDate);
-                                
-                                // Close the calendar
-                                document.body.dataset[`task-date-open-${index}`] = "false";
-                                
-                                // Force re-render
-                                setExtractedTasks((tasks) => [...tasks]);
+                                console.log(`For task index:`, index);
+
+                                // Use the dedicated function for updating individual task dates
+                                updateIndividualTaskDate(index, date);
+
+                                // Force re-render with the new date (optional, as updateIndividualTaskDate already updates state)
+                                requestAnimationFrame(() => {
+                                  setExtractedTasks((currentTasks) => {
+                                    return [...currentTasks];
+                                  });
+                                });
                               }}
                               className="text-white border-none p-2"
                               initialFocus
@@ -878,16 +946,20 @@ export default function NaturalLanguageModal({
                   <Calendar className="h-4 w-4 mr-1" />
                   {formatDuration(task.duration)}
                 </div>
-                
-                {/* Blue date indicator - shown for Tomorrow and custom dates, but NOT for Today */}
-                {selectedDate && 
-                  !isSameDay(selectedDate, new Date()) && (
+
+                {/* Blue date indicator - show task-specific date if available */}
+                {task.date && !isSameDay(task.date, new Date()) ? (
+                  <div className="flex items-center text-blue-400 font-medium bg-blue-500/10 px-2 py-0.5 rounded">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    {formatShortDate(task.date)}
+                  </div>
+                ) : selectedDate && !isSameDay(selectedDate, new Date()) ? (
                   <div className="flex items-center text-blue-400 font-medium bg-blue-500/10 px-2 py-0.5 rounded">
                     <Calendar className="h-4 w-4 mr-1" />
                     {formatShortDate(selectedDate)}
                   </div>
-                )}
-                
+                ) : null}
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -920,7 +992,7 @@ export default function NaturalLanguageModal({
       );
 
       console.log("Setting date for all tasks:", cleanDate.toISOString());
-      
+
       setExtractedTasks((prevTasks) => {
         const newTasks = prevTasks.map((task) => {
           // Create a new Date object for each task to prevent reference issues
@@ -929,34 +1001,37 @@ export default function NaturalLanguageModal({
             date: new Date(cleanDate),
           };
         });
-        
-        console.log("Updated tasks with new dates:", 
-          newTasks.map(t => ({
+
+        console.log(
+          "Updated tasks with new dates:",
+          newTasks.map((t) => ({
             title: t.title,
-            date: t.date ? t.date.toISOString() : null
+            date: t.date ? t.date.toISOString() : null,
           }))
         );
-        
+
         return newTasks;
       });
 
       // Set the selected date (for UI highlighting)
       setSelectedDate(cleanDate);
       console.log("Selected date updated to:", cleanDate.toISOString());
-      
+
       // Close any open date pickers
       setShowDatePicker(false);
-      
-      // Close any task-specific date pickers
-      Object.keys(document.body.dataset)
-        .filter(key => key.startsWith("task-date-open-"))
-        .forEach(key => {
-          document.body.dataset[key] = "false";
+
+      // Clear session storage for all task date pickers
+      for (let i = 0; i < 20; i++) {
+        // Assuming no more than 20 tasks
+        sessionStorage.removeItem(`taskDatePickerOpen-${i}`);
+      }
+
+      // Ensure a re-render occurs to reflect all the changes
+      setTimeout(() => {
+        setExtractedTasks((prev) => {
+          return prev.map((task) => ({ ...task }));
         });
-      
-      // Force re-render by setting state
-      setExtractedTasks(prev => [...prev]);
-      
+      }, 0);
     } catch (error) {
       console.error("Error updating task dates:", error);
     }
@@ -998,10 +1073,10 @@ export default function NaturalLanguageModal({
         <div className="w-full flex items-center justify-center gap-1 h-9 text-xs">
           <Button
             variant={
-              selectedDate && 
-              !isSameDay(selectedDate, new Date()) && 
+              selectedDate &&
+              !isSameDay(selectedDate, new Date()) &&
               !isSameDay(selectedDate, addDays(new Date(), 1))
-                ? "default" 
+                ? "default"
                 : "outline"
             }
             size="sm"
@@ -1142,10 +1217,10 @@ export default function NaturalLanguageModal({
           <div className="relative" data-date-picker="true">
             <Button
               variant={
-                selectedDate && 
-                !isSameDay(selectedDate, new Date()) && 
+                selectedDate &&
+                !isSameDay(selectedDate, new Date()) &&
                 !isSameDay(selectedDate, addDays(new Date(), 1))
-                  ? "default" 
+                  ? "default"
                   : "outline"
               }
               size="sm"
