@@ -23,14 +23,31 @@ export function TimePicker({ value = "09:00", onChange, className }: TimePickerP
   let minutes = 0;
   
   try {
-    if (value && /^\d{1,2}:\d{2}$/.test(value)) {
-      [hours, minutes] = value.split(":").map(Number);
+    if (value) {
+      // Support both HH:MM and H:MM formats
+      if (/^\d{1,2}:\d{2}$/.test(value)) {
+        [hours, minutes] = value.split(":").map(Number);
+      } 
+      // Try to parse other time formats as fallback
+      else {
+        const now = new Date();
+        now.setHours(9, 0, 0, 0); // Default to 9:00 AM
+        
+        try {
+          // Try to create a date object and extract hours and minutes
+          const date = new Date(`2025-01-01T${value}`);
+          if (!isNaN(date.getTime())) {
+            hours = date.getHours();
+            minutes = date.getMinutes();
+          }
+        } catch (parseError) {
+          console.warn("Could not parse time, using default 9:00 AM");
+        }
+      }
       
       // Validate hours and minutes are in range
       hours = Math.min(Math.max(0, hours), 23);
       minutes = Math.min(Math.max(0, minutes), 59);
-    } else {
-      console.warn("Invalid time format:", value);
     }
   } catch (error) {
     console.error("Error parsing time:", error);
@@ -70,16 +87,16 @@ export function TimePicker({ value = "09:00", onChange, className }: TimePickerP
   };
   
   return (
-    <div className={cn("flex space-x-2", className)}>
+    <div className={cn("flex space-x-1", className)}>
       {/* Hour Select */}
       <Select 
         value={displayHour.toString()} 
         onValueChange={handleHourChange}
       >
-        <SelectTrigger className="flex-1 h-10 bg-slate-800 border-slate-700 text-white">
+        <SelectTrigger className="flex-1 h-9 bg-slate-800/80 border-slate-700 text-white text-sm">
           <SelectValue placeholder="Hour" />
         </SelectTrigger>
-        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+        <SelectContent className="bg-slate-800 border-slate-700 text-white z-[9999]">
           {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
             <SelectItem 
               key={hour} 
@@ -97,10 +114,10 @@ export function TimePicker({ value = "09:00", onChange, className }: TimePickerP
         value={minutes.toString().padStart(2, "0")} 
         onValueChange={handleMinuteChange}
       >
-        <SelectTrigger className="flex-1 h-10 bg-slate-800 border-slate-700 text-white">
-          <SelectValue placeholder="Minute" />
+        <SelectTrigger className="flex-1 h-9 bg-slate-800/80 border-slate-700 text-white text-sm">
+          <SelectValue placeholder="Min" />
         </SelectTrigger>
-        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+        <SelectContent className="bg-slate-800 border-slate-700 text-white z-[9999]">
           {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
             <SelectItem 
               key={minute} 
@@ -118,10 +135,10 @@ export function TimePicker({ value = "09:00", onChange, className }: TimePickerP
         value={ampm} 
         onValueChange={handleAmPmChange}
       >
-        <SelectTrigger className="w-20 h-10 bg-slate-800 border-slate-700 text-white">
+        <SelectTrigger className="w-16 h-9 bg-slate-800/80 border-slate-700 text-white text-sm">
           <SelectValue placeholder="AM/PM" />
         </SelectTrigger>
-        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+        <SelectContent className="bg-slate-800 border-slate-700 text-white z-[9999]">
           <SelectItem value="AM" className="hover:bg-slate-700">AM</SelectItem>
           <SelectItem value="PM" className="hover:bg-slate-700">PM</SelectItem>
         </SelectContent>

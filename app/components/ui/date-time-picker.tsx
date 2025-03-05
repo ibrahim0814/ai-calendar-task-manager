@@ -34,6 +34,27 @@ export function DateTimePicker({
     return undefined;
   });
   const [isOpen, setIsOpen] = React.useState(false);
+  
+  // Make sure picker closes when component values change and on unmount
+  React.useEffect(() => {
+    setIsOpen(false);
+    
+    return () => {
+      setIsOpen(false);
+    };
+  }, [value]);
+  
+  // Close all other date pickers when this one opens
+  React.useEffect(() => {
+    if (isOpen) {
+      // Close any task calendars
+      Object.keys(document.body.dataset)
+        .filter(key => key.startsWith("task-date-open-"))
+        .forEach(key => {
+          document.body.dataset[key] = "false";
+        });
+    }
+  }, [isOpen]);
 
   const hours = Array.from({ length: 12 }, (_, i) => i + 1);
   const handleDateSelect = (selectedDate: Date | undefined) => {
@@ -109,7 +130,7 @@ export function DateTimePicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 bg-slate-800 border-slate-700" style={{ zIndex: 9999 }}>
+      <PopoverContent className="w-auto p-0 bg-slate-800 border-slate-700" style={{ zIndex: 999 }}>
         <div className="sm:flex">
           {showDate && (
             <Calendar

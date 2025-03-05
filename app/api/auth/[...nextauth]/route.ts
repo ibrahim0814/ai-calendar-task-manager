@@ -20,7 +20,7 @@ const handler = NextAuth({
         params: {
           scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
           access_type: "offline",
-          // Remove forced consent prompt to avoid re-authorizing on every login
+          prompt: "consent", // Always request refresh token
         },
       },
     }),
@@ -30,7 +30,19 @@ const handler = NextAuth({
   debug: true, // Enable debug mode
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 14 * 24 * 60 * 60, // 14 days (2 weeks)
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 14 * 24 * 60 * 60, // 14 days (2 weeks)
+      },
+    },
   },
   callbacks: {
     async jwt({ token, account, user }) {
@@ -44,7 +56,7 @@ const handler = NextAuth({
           ...token,
           accessToken: account.access_token,
           refreshToken: account.refresh_token,
-          accessTokenExpires: account.expires_at ? account.expires_at * 1000 : 0,
+          accessTokenExpires: account.expires_at ? account.expires_at * 1000 : Date.now() + 3600 * 1000,
         };
       }
 
@@ -56,6 +68,14 @@ const handler = NextAuth({
 
       // Access token has expired, try to update it
       console.log("JWT Callback - Token expired, attempting refresh");
+      if (!token.refreshToken) {
+        console.error("No refresh token available");
+        return {
+          ...token,
+          error: "NoRefreshTokenError",
+        };
+      }
+      
       try {
         const response = await fetch("https://oauth2.googleapis.com/token", {
           method: "POST",
@@ -82,7 +102,9 @@ const handler = NextAuth({
         return {
           ...token,
           accessToken: refreshedTokens.access_token,
-          accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
+          accessTokenExpires: Date.now() + (refreshedTokens.expires_in || 3600) * 1000,
+          // Keep the refresh token if a new one wasn't returned
+          refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
         };
       } catch (error) {
         console.error("Error refreshing token:", error);

@@ -150,6 +150,12 @@ export default function TaskModal({
   // Add a click-outside handler to close the date pickers
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Make sure only one date picker is open at a time
+      if (startDateOpen && endDateOpen) {
+        // If somehow both are open (shouldn't happen), close one
+        setEndDateOpen(false);
+      }
+
       // Handle start date picker
       if (startDateOpen) {
         const startDateElement = document.querySelector(
@@ -279,7 +285,7 @@ export default function TaskModal({
             console.error("Invalid time format:", timeStr);
             return;
           }
-          
+
           const [hours, minutes] = timeStr.split(":").map(Number);
           const newDate = new Date(startDate);
           newDate.setHours(hours);
@@ -305,7 +311,7 @@ export default function TaskModal({
             console.error("Invalid time format:", timeStr);
             return;
           }
-          
+
           const [hours, minutes] = timeStr.split(":").map(Number);
           const newDate = new Date(endDate);
           newDate.setHours(hours);
@@ -373,7 +379,7 @@ export default function TaskModal({
       try {
         // Combine date and time properly - with validation
         const startDateTime = new Date(startDate);
-        
+
         if (!startTimeStr || !/^\d{1,2}:\d{2}$/.test(startTimeStr)) {
           throw new Error(`Invalid start time format: ${startTimeStr}`);
         }
@@ -498,10 +504,17 @@ export default function TaskModal({
                       variant="outline"
                       className="w-full justify-start text-left font-normal bg-slate-800 border-slate-700 text-white h-11 hover:bg-slate-700/50 transition-colors"
                       onClick={() => {
-                        // Simply toggle the calendar visibility
-                        setStartDateOpen(!startDateOpen);
-                        // Make sure the other picker is closed
-                        setEndDateOpen(false);
+                        if (endDateOpen) {
+                          // If the other picker is open, close it first
+                          setEndDateOpen(false);
+                          // Use a small timeout to prevent both calendars from appearing
+                          setTimeout(() => {
+                            setStartDateOpen(true);
+                          }, 10);
+                        } else {
+                          // Simply toggle this calendar
+                          setStartDateOpen(!startDateOpen);
+                        }
                       }}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -511,7 +524,7 @@ export default function TaskModal({
                     </Button>
 
                     {startDateOpen && (
-                      <div className="absolute z-[9999] mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-md shadow-lg">
+                      <div className="absolute z-30 mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-md shadow-lg">
                         <Calendar
                           mode="single"
                           selected={startDate || undefined}
@@ -540,10 +553,17 @@ export default function TaskModal({
                       variant="outline"
                       className="w-full justify-start text-left font-normal bg-slate-800 border-slate-700 text-white h-11 hover:bg-slate-700/50 transition-colors"
                       onClick={() => {
-                        // Simply toggle the calendar visibility
-                        setEndDateOpen(!endDateOpen);
-                        // Make sure the other picker is closed
-                        setStartDateOpen(false);
+                        if (startDateOpen) {
+                          // If the other picker is open, close it first
+                          setStartDateOpen(false);
+                          // Use a small timeout to prevent both calendars from appearing
+                          setTimeout(() => {
+                            setEndDateOpen(true);
+                          }, 10);
+                        } else {
+                          // Simply toggle this calendar
+                          setEndDateOpen(!endDateOpen);
+                        }
                       }}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -553,7 +573,7 @@ export default function TaskModal({
                     </Button>
 
                     {endDateOpen && (
-                      <div className="absolute z-[9999] mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-md shadow-lg">
+                      <div className="absolute z-30 mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-md shadow-lg">
                         <Calendar
                           mode="single"
                           selected={endDate || undefined}
