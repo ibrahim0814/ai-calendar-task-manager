@@ -2,7 +2,7 @@
 
 import { useAuth } from "../providers/auth-provider";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
 export default function ProtectedRoute({
   children,
@@ -12,65 +12,39 @@ export default function ProtectedRoute({
   const { user, loading } = useAuth();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
-  const redirectAttemptedRef = useRef(false);
-  const redirectTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Set isClient to true on component mount
   useEffect(() => {
     setIsClient(true);
-
-    // Cleanup function
-    return () => {
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-    };
   }, []);
 
   // Handle authentication state changes
   useEffect(() => {
-    // Only proceed if we're on the client side
-    if (!isClient) return;
+    if (!isClient || loading) return;
 
-    // Clear any existing redirect timeout
-    if (redirectTimeoutRef.current) {
-      clearTimeout(redirectTimeoutRef.current);
+    const currentPath = window.location.pathname;
+
+    if (!user && currentPath !== "/auth") {
+      router.push("/auth");
+      return;
     }
 
-    // If we're not loading and there's no user, redirect to auth page
-    if (!loading && !user && !redirectAttemptedRef.current) {
-      console.log(
-        "Protected route - No user detected, redirecting to auth page"
-      );
-      redirectAttemptedRef.current = true;
-
-      // Add a small delay to prevent immediate redirect and potential loops
-      redirectTimeoutRef.current = setTimeout(() => {
-        const currentPath = window.location.pathname;
-        // Only redirect if we're not already on the auth page
-        if (currentPath !== "/auth") {
-          router.replace("/auth");
-        }
-      }, 100);
-    }
-
-    // If we have a user and we're on the auth page, redirect to home
-    if (!loading && user) {
-      const currentPath = window.location.pathname;
-      if (currentPath === "/auth") {
-        router.replace("/");
-      }
+    if (user && currentPath === "/auth") {
+      router.push("/");
     }
   }, [user, loading, router, isClient]);
 
+  // Don't render anything on the server
+  if (!isClient) {
+    return null;
+  }
+
   // Show loading state
-  if (loading || !isClient) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-        <p className="ml-2 text-sm text-slate-500">
-          Loading authentication state...
-        </p>
+        <p className="ml-2 text-sm text-slate-500">Loading...</p>
       </div>
     );
   }
@@ -84,7 +58,7 @@ export default function ProtectedRoute({
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950">
       <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-      <p className="ml-2 text-sm text-slate-500">Redirecting to login...</p>
+      <p className="ml-2 text-sm text-slate-500">Redirecting...</p>
     </div>
   );
 }
