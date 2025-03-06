@@ -161,3 +161,13 @@ Key issues found and fixed:
 - State updates during render causing potential infinite loops
 - Overly complex component structures
 - Inefficient state updates and management
+# API Error Handling Lessons
+- Always check if API responses are valid JSON before parsing
+- Add specific error handling for OpenAI API calls
+- Return valid JSON even when errors occur in API routes
+- Provide fallback values when parsing fails
+- Add detailed error messages with suggestions for users
+
+# Scratchpad
+
+## Current Task: Fix JSON Parsing Error in Natural Language Task Extraction

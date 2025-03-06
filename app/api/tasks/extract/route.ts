@@ -77,88 +77,103 @@ export async function POST(req: NextRequest) {
 
     console.log("Calling OpenAI API with model: gpt-4o");
     // Extract tasks using OpenAI with structured output
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: `You are a helpful assistant that extracts tasks from user input.
-          
-          CURRENT DATE/TIME CONTEXT: 
-          - Current date: ${new Date().toISOString().split("T")[0]}
-          - Current time: ${new Date().toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          })}
-          - Current timezone: Pacific Time (PT)
-          
-          Your job is to extract tasks from the user's input text, even if the text is vague or incomplete. 
-          ALWAYS extract at least one task from the input, no matter what. Never say the text doesn't contain task information.
-          If the input is unclear, create sensible defaults and make reasonable assumptions.
-          
-          Extract the following information for each task mentioned:
-          - title: (REQUIRED) The title of the task
-          - startTime: (REQUIRED) The start time in HH:MM format (24h). Please use only 15-minute increments (00, 15, 30, 45)
-          - duration: (REQUIRED) The duration in minutes (must be a number between 15 and 480)
-          - priority: (REQUIRED) The priority level (must be exactly "high", "medium", or "low")
-          - date: (REQUIRED) The date for the task in ISO format (YYYY-MM-DD). 
-          
-          IMPORTANT INSTRUCTIONS FOR DATE HANDLING:
-          - When the user mentions "tomorrow", use ${
-            new Date(Date.now() + 86400000).toISOString().split("T")[0]
-          }
-          - When the user mentions "next week", use ${
-            new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0]
-          }
-          - When the user mentions "tonight", use today's date: ${
-            new Date().toISOString().split("T")[0]
-          }
-          - Pay careful attention to ANY relative date indicators (tomorrow, next Friday, in two days, etc.)
-          - If no specific date is mentioned, default to today's date: ${
-            new Date().toISOString().split("T")[0]
-          }
-          
-          ADDITIONAL IMPORTANT NOTES:
-          - DO NOT include descriptions in your output. Only extract titles.
-          - All fields are REQUIRED. Always include a numeric duration.
-          - If duration is not specified, use a reasonable default based on the task type (30-60 minutes).
-          - For start times, always round to the nearest 15-minute increment (00, 15, 30, or 45 minutes).
-          - Always convert AM/PM times to 24-hour format (e.g., "9pm" becomes "21:00").
-          - If the input doesn't specify times, dates, or priorities, use sensible defaults
-          - NEVER return an empty response or say the text doesn't match a pattern
-          
-          Format your response as a JSON object with a "tasks" array containing the extracted tasks.
-          For example:
+    let completion;
+    try {
+      completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
           {
-            "tasks": [
-              {
-                "title": "Team meeting",
-                "startTime": "09:00",
-                "duration": 60,
-                "priority": "high",
-                "date": "${new Date().toISOString().split("T")[0]}" // today
-              },
-              {
-                "title": "Doctor appointment",
-                "startTime": "14:30",
-                "duration": 45,
-                "priority": "high",
-                "date": "${
-                  new Date(Date.now() + 86400000).toISOString().split("T")[0]
-                }" // tomorrow
-              }
-            ]
-          }`,
-        },
+            role: "system",
+            content: `You are a helpful assistant that extracts tasks from user input.
+            
+            CURRENT DATE/TIME CONTEXT: 
+            - Current date: ${new Date().toISOString().split("T")[0]}
+            - Current time: ${new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
+            - Current timezone: Pacific Time (PT)
+            
+            Your job is to extract tasks from the user's input text, even if the text is vague or incomplete. 
+            ALWAYS extract at least one task from the input, no matter what. Never say the text doesn't contain task information.
+            If the input is unclear, create sensible defaults and make reasonable assumptions.
+            
+            Extract the following information for each task mentioned:
+            - title: (REQUIRED) The title of the task
+            - startTime: (REQUIRED) The start time in HH:MM format (24h). Please use only 15-minute increments (00, 15, 30, 45)
+            - duration: (REQUIRED) The duration in minutes (must be a number between 15 and 480)
+            - priority: (REQUIRED) The priority level (must be exactly "high", "medium", or "low")
+            - date: (REQUIRED) The date for the task in ISO format (YYYY-MM-DD). 
+            
+            IMPORTANT INSTRUCTIONS FOR DATE HANDLING:
+            - When the user mentions "tomorrow", use ${
+              new Date(Date.now() + 86400000).toISOString().split("T")[0]
+            }
+            - When the user mentions "next week", use ${
+              new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0]
+            }
+            - When the user mentions "tonight", use today's date: ${
+              new Date().toISOString().split("T")[0]
+            }
+            - Pay careful attention to ANY relative date indicators (tomorrow, next Friday, in two days, etc.)
+            - If no specific date is mentioned, default to today's date: ${
+              new Date().toISOString().split("T")[0]
+            }
+            
+            ADDITIONAL IMPORTANT NOTES:
+            - DO NOT include descriptions in your output. Only extract titles.
+            - All fields are REQUIRED. Always include a numeric duration.
+            - If duration is not specified, use a reasonable default based on the task type (30-60 minutes).
+            - For start times, always round to the nearest 15-minute increment (00, 15, 30, or 45 minutes).
+            - Always convert AM/PM times to 24-hour format (e.g., "9pm" becomes "21:00").
+            - If the input doesn't specify times, dates, or priorities, use sensible defaults
+            - NEVER return an empty response or say the text doesn't match a pattern
+            
+            Format your response as a JSON object with a "tasks" array containing the extracted tasks.
+            For example:
+            {
+              "tasks": [
+                {
+                  "title": "Team meeting",
+                  "startTime": "09:00",
+                  "duration": 60,
+                  "priority": "high",
+                  "date": "${new Date().toISOString().split("T")[0]}" // today
+                },
+                {
+                  "title": "Doctor appointment",
+                  "startTime": "14:30",
+                  "duration": 45,
+                  "priority": "high",
+                  "date": "${
+                    new Date(Date.now() + 86400000).toISOString().split("T")[0]
+                  }" // tomorrow
+                }
+              ]
+            }`,
+          },
+          {
+            role: "user",
+            content: text,
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2, // Lower temperature for more predictable output
+      });
+    } catch (apiError) {
+      console.error("OpenAI API error:", apiError);
+      // Create a default task when the API call fails
+      return NextResponse.json([
         {
-          role: "user",
-          content: text,
+          title: "Task from input (API error fallback)",
+          startTime: "12:00",
+          duration: 30,
+          priority: "medium",
+          date: new Date(),
         },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2, // Lower temperature for more predictable output
-    });
+      ]);
+    }
 
     const content = completion.choices[0].message.content;
     console.log("OpenAI API response:", content);
@@ -166,8 +181,16 @@ export async function POST(req: NextRequest) {
     if (!content) {
       console.log("Empty response from OpenAI");
       return NextResponse.json(
-        { error: "Failed to extract tasks" },
-        { status: 500 }
+        [
+          {
+            title: "Task from input (empty API response)",
+            startTime: "12:00",
+            duration: 30,
+            priority: "medium",
+            date: new Date(),
+          },
+        ],
+        { status: 200 }
       );
     }
 

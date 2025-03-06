@@ -224,11 +224,22 @@ export default function NaturalLanguageModal({
 
         let tasks: TaskExtract[];
         try {
+          // Check if the response starts with "An error" which indicates it's not JSON
+          if (rawResponse.trim().startsWith("An error")) {
+            console.error(
+              "API returned an error message instead of JSON:",
+              rawResponse
+            );
+            throw new Error("The server encountered an error: " + rawResponse);
+          }
+
           tasks = JSON.parse(rawResponse);
           console.log("Successfully parsed tasks:", JSON.stringify(tasks));
         } catch (parseError) {
           console.error("Error parsing tasks JSON:", parseError);
-          throw new Error("The response from the server was not valid JSON");
+          throw new Error(
+            "The response from the server was not valid JSON. Please check the server logs for more details."
+          );
         }
 
         // Fix the tasks constant issue
@@ -355,9 +366,21 @@ export default function NaturalLanguageModal({
         setProcessingStep("confirmation");
       } catch (err) {
         console.error("Error extracting tasks:", err);
-        setError(
-          err instanceof Error ? err.message : "An unexpected error occurred"
-        );
+
+        // Create a more user-friendly error message
+        let errorMessage =
+          "An unexpected error occurred while extracting tasks.";
+
+        if (err instanceof Error) {
+          // If it's a standard error object, use its message
+          errorMessage = err.message;
+        } else if (typeof err === "string") {
+          // If it's a string error
+          errorMessage = err;
+        }
+
+        // Add more context for the user
+        setError(`${errorMessage} Please try again or simplify your input.`);
       } finally {
         setLoading(false);
       }
@@ -621,7 +644,35 @@ export default function NaturalLanguageModal({
             }
           }}
         />
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-800">
+            <div className="flex items-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2 text-red-600"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span className="font-medium">Error:</span>
+            </div>
+            <p className="mt-1 ml-7">{error}</p>
+            <div className="mt-2 ml-7 text-sm">
+              <p>Suggestions:</p>
+              <ul className="list-disc ml-5 mt-1">
+                <li>Try simplifying your input text</li>
+                <li>Make sure your time formats are clear (e.g., "8:00 AM")</li>
+                <li>Specify durations more clearly (e.g., "for 30 minutes")</li>
+                <li>Try again in a few moments</li>
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
       <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-2">
         {/* Mobile order: Submit first, then Cancel */}
