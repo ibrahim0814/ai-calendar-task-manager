@@ -101,6 +101,7 @@ function HomePage() {
         // Only fetch if user is authenticated
         if (!user) {
           setTasks([]);
+          setLoading(false);
           return;
         }
 
@@ -113,6 +114,9 @@ function HomePage() {
           // Check if we got a redirect response
           if (data.redirect && data.redirectUrl) {
             console.log("Session expired, redirecting to:", data.redirectUrl);
+            // Clear tasks before redirecting
+            setTasks([]);
+            setLoading(false);
             window.location.href = data.redirectUrl;
             return;
           }
@@ -144,9 +148,15 @@ function HomePage() {
 
   // Update when the component mounts or month changes or user changes
   useEffect(() => {
+    let mounted = true;
+
     if (user) {
       fetchTasksForMonth(currentMonth, currentYear);
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [currentMonth, currentYear, user, fetchTasksForMonth]);
 
   // Only switch to tasks tab on mobile when a date is explicitly selected
@@ -708,7 +718,5 @@ function HomePage() {
     </ProtectedRoute>
   );
 }
-
-// Calendar task updating has been integrated directly into handleUpdateTask with the skipTabSwitch parameter
 
 export default HomePage;

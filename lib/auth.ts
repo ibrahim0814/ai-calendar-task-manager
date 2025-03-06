@@ -1,7 +1,7 @@
-import { getServerSession } from "next-auth"
-import type { Session, DefaultSession } from "next-auth"
-import { NextAuthOptions } from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
+import { getServerSession } from "next-auth";
+import type { Session, DefaultSession } from "next-auth";
+import { NextAuthOptions } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
 
 // Extend the default session user type
 declare module "next-auth" {
@@ -10,7 +10,7 @@ declare module "next-auth" {
     refreshToken?: string;
     error?: string;
   }
-  
+
   // Extend the user property separately to avoid modifier conflicts
   interface User {
     // Add additional user properties
@@ -36,14 +36,17 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       authorization: {
         params: {
-          scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
+          scope:
+            "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
           access_type: "offline",
           prompt: "consent", // Always request refresh token
         },
       },
     }),
   ],
-  secret: process.env.NEXTAUTH_SECRET || "development-secret-do-not-use-in-production",
+  secret:
+    process.env.NEXTAUTH_SECRET ||
+    "development-secret-do-not-use-in-production",
   debug: true,
   session: {
     strategy: "jwt",
@@ -62,98 +65,73 @@ export const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
-    async jwt({ token, account, user }) {
-      console.log("JWT Callback - account:", !!account);
-      
+    async jwt({ token, account }) {
       // Initial sign in
-      if (account && user) {
-        console.log("JWT Callback - Processing initial sign in");
-        return {
-          ...token,
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token,
-          accessTokenExpires: account.expires_at ? account.expires_at * 1000 : Date.now() + 3600 * 1000,
-        };
+      if (account) {
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+        token.accessTokenExpires = account.expires_at
+          ? account.expires_at * 1000
+          : 0;
       }
 
       // Return previous token if the access token has not expired yet
-      if (Date.now() < (token.accessTokenExpires as number || 0)) {
-        console.log("JWT Callback - Using existing token");
+      const now = Date.now();
+      if (token.accessTokenExpires && now < token.accessTokenExpires) {
         return token;
       }
 
-      // Access token has expired, try to update it
-      console.log("JWT Callback - Token expired, attempting refresh");
-      if (!token.refreshToken) {
-        console.error("No refresh token available");
-        return {
-          ...token,
-          error: "NoRefreshTokenError",
-        };
-      }
-      
-      try {
-        const response = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID || "",
-            client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-            grant_type: "refresh_token",
-            refresh_token: token.refreshToken as string,
-          }),
-        });
+      // Access token has expired, try to update it using refresh token
+      if (token.refreshToken) {
+        try {
+          const response = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: process.env.GOOGLE_CLIENT_ID || "",
+              client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+              grant_type: "refresh_token",
+              refresh_token: token.refreshToken,
+            }),
+          });
 
-        const refreshedTokens = await response.json();
-        
-        if (!response.ok) {
-          console.error("Failed to refresh token:", refreshedTokens);
+          const tokens = await response.json();
+
+          if (!response.ok) throw tokens;
+
           return {
             ...token,
-            error: "RefreshAccessTokenError",
+            accessToken: tokens.access_token,
+            accessTokenExpires: Date.now() + tokens.expires_in * 1000,
           };
+        } catch (error) {
+          console.error("Error refreshing access token", error);
+          return { ...token, error: "RefreshAccessTokenError" };
         }
-
-        console.log("Token refreshed successfully");
-        return {
-          ...token,
-          accessToken: refreshedTokens.access_token,
-          accessTokenExpires: Date.now() + (refreshedTokens.expires_in || 3600) * 1000,
-          // Keep the refresh token if a new one wasn't returned
-          refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
-        };
-      } catch (error) {
-        console.error("Error refreshing token:", error);
-        return {
-          ...token,
-          error: "RefreshAccessTokenError",
-        };
       }
+
+      return token;
     },
     async session({ session, token }) {
-      console.log("Session Callback - session:", !!session);
-      
       if (token) {
-        session.accessToken = token.accessToken as string;
-        session.refreshToken = token.refreshToken as string;
-        session.error = token.error as string;
-        
-        // If session.user exists, make sure it has all required properties
+        session.accessToken = token.accessToken;
+        session.refreshToken = token.refreshToken;
+        session.error = token.error;
+
         if (session.user) {
-          // Use email as ID if email exists, otherwise use sub
-          session.user.id = token.sub as string;
+          session.user.id = token.sub;
         }
       }
-      
-      return session
+
+      return session;
     },
   },
-}
+};
 
 export async function auth(): Promise<Session | null> {
   console.log("Auth function called");
   try {
-    const session = await getServerSession(authOptions) as Session | null;
+    const session = (await getServerSession(authOptions)) as Session | null;
     console.log("Session exists:", !!session);
     return session;
   } catch (error) {
