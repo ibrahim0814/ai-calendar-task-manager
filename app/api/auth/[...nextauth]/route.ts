@@ -20,7 +20,7 @@ const handler = NextAuth({
         params: {
           scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
           access_type: "offline",
-          prompt: "consent", // Always request refresh token
+          prompt: "select_account",
         },
       },
     }),
