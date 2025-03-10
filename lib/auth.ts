@@ -39,7 +39,7 @@ export const authOptions: NextAuthOptions = {
           scope:
             "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
           access_type: "offline",
-          prompt: "consent", // Always request refresh token
+          // No prompt by default - will be set dynamically based on the signIn flow
         },
       },
     }),
@@ -64,55 +64,81 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
+  pages: {
+    signIn: '/auth', // Custom sign-in page
+  },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // If no callbackUrl is provided, use the default baseUrl
+      if (!url.startsWith('/')) {
+        return baseUrl
+      }
+      // Otherwise, return the provided callback URL
+      return url.startsWith(baseUrl) ? url : baseUrl
+    },
     async jwt({ token, account }) {
       // Initial sign in
       if (account) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.accessTokenExpires = account.expires_at
-          ? account.expires_at * 1000
-          : 0;
+        console.log("JWT Callback - Processing initial sign in from lib/auth.ts");
+        return {
+          ...token,
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          accessTokenExpires: account.expires_at
+            ? account.expires_at * 1000
+            : Date.now() + 3600 * 1000,
+        };
       }
 
       // Return previous token if the access token has not expired yet
       const now = Date.now();
       if (token.accessTokenExpires && now < token.accessTokenExpires) {
+        console.log("JWT Callback - Using existing token from lib/auth.ts");
         return token;
       }
 
       // Access token has expired, try to update it using refresh token
-      if (token.refreshToken) {
-        try {
-          const response = await fetch("https://oauth2.googleapis.com/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              client_id: process.env.GOOGLE_CLIENT_ID || "",
-              client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-              grant_type: "refresh_token",
-              refresh_token: token.refreshToken,
-            }),
-          });
-
-          const tokens = await response.json();
-
-          if (!response.ok) throw tokens;
-
-          return {
-            ...token,
-            accessToken: tokens.access_token,
-            accessTokenExpires: Date.now() + tokens.expires_in * 1000,
-          };
-        } catch (error) {
-          console.error("Error refreshing access token", error);
-          return { ...token, error: "RefreshAccessTokenError" };
-        }
+      console.log("JWT Callback - Token expired, attempting refresh from lib/auth.ts");
+      if (!token.refreshToken) {
+        console.error("No refresh token available in lib/auth.ts");
+        return { ...token, error: "NoRefreshTokenError" };
       }
 
-      return token;
+      try {
+        const response = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: process.env.GOOGLE_CLIENT_ID || "",
+            client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+            grant_type: "refresh_token",
+            refresh_token: token.refreshToken,
+          }),
+        });
+
+        const tokens = await response.json();
+
+        if (!response.ok) {
+          console.error("Failed to refresh token in lib/auth.ts:", tokens);
+          throw tokens;
+        }
+
+        console.log("Token refreshed successfully in lib/auth.ts");
+        return {
+          ...token,
+          accessToken: tokens.access_token,
+          accessTokenExpires: Date.now() + (tokens.expires_in || 3600) * 1000,
+          // Keep the refresh token if a new one wasn't returned
+          refreshToken: tokens.refresh_token ?? token.refreshToken,
+        };
+      } catch (error) {
+        console.error("Error refreshing access token in lib/auth.ts", error);
+        return { ...token, error: "RefreshAccessTokenError" };
+      }
     },
     async session({ session, token }) {
+      console.log("Session Callback - token exists:", !!token);
+      
       if (token) {
         session.accessToken = token.accessToken;
         session.refreshToken = token.refreshToken;
@@ -133,6 +159,12 @@ export async function auth(): Promise<Session | null> {
   try {
     const session = (await getServerSession(authOptions)) as Session | null;
     console.log("Session exists:", !!session);
+    
+    // Log if there are any errors in the session
+    if (session?.error) {
+      console.error("Session has error:", session.error);
+    }
+    
     return session;
   } catch (error) {
     console.error("Error getting server session:", error);

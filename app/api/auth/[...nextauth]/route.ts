@@ -11,20 +11,21 @@ if (!process.env.NEXTAUTH_SECRET) {
   console.warn("WARNING: NEXTAUTH_SECRET is not set. Using an insecure default for development only.");
 }
 
+// The main setup without specifying the prompt in authorization (will be dynamic)
+const googleProvider = GoogleProvider({
+  clientId: process.env.GOOGLE_CLIENT_ID || "",
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  authorization: {
+    params: {
+      scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
+      access_type: "offline",
+      // No prompt by default - will be set dynamically based on the signIn flow
+    },
+  },
+});
+
 const handler = NextAuth({
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      authorization: {
-        params: {
-          scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
-          access_type: "offline",
-          prompt: "select_account",
-        },
-      },
-    }),
-  ],
+  providers: [googleProvider],
   // Add a default secret if none is provided
   secret: process.env.NEXTAUTH_SECRET || "development-secret-do-not-use-in-production",
   debug: true, // Enable debug mode
@@ -44,7 +45,18 @@ const handler = NextAuth({
       },
     },
   },
+  pages: {
+    signIn: '/auth', // Custom sign-in page
+  },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // If no callbackUrl is provided, use the default baseUrl
+      if (!url.startsWith('/')) {
+        return baseUrl
+      }
+      // Otherwise, return the provided callback URL
+      return url.startsWith(baseUrl) ? url : baseUrl
+    },
     async jwt({ token, account, user }) {
       console.log("JWT Callback account details:", account ? "Present" : "Not present"); 
       console.log("JWT Callback user details:", user ? "Present" : "Not present");

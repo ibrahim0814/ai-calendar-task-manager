@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse(
         JSON.stringify({
           message: "Unauthorized",
+          error: "MissingAccessToken",
           redirect: true,
           redirectUrl: "/auth",
         }),
@@ -79,6 +80,106 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const monthParam = url.searchParams.get("month");
     const yearParam = url.searchParams.get("year");
+    const eventId = url.searchParams.get("eventId");
+
+    // If event ID is provided, return just that event
+    if (eventId) {
+      try {
+        const oauth2Client = new google.auth.OAuth2();
+        oauth2Client.setCredentials({
+          access_token: session.accessToken,
+          refresh_token: session.refreshToken,
+        });
+
+        const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+        
+        // First get all calendars the user has access to
+        const calendarList = await calendar.calendarList.list();
+        const calendarIds = calendarList.data.items
+          ?.map((cal) => cal.id)
+          .filter((id) => id !== null && id !== undefined) || ["primary"];
+          
+        // Try to find the event in any of the user's calendars
+        for (const calendarId of calendarIds) {
+          try {
+            if (calendarId) {
+              const event = await calendar.events.get({
+                calendarId: calendarId,
+                eventId: eventId
+              });
+              
+              if (event.data) {
+                // Format and return the event
+                let priority = "medium"; // Default priority
+                let cleanDescription = event.data.description || "";
+
+                if (event.data.description) {
+                  // Check for priority tag in the description
+                  const priorityMatch = event.data.description.match(
+                    /\[Priority: (high|medium|low)\]/i
+                  );
+                  if (priorityMatch && priorityMatch[1]) {
+                    priority = priorityMatch[1].toLowerCase();
+                    cleanDescription = event.data.description
+                      .replace(/\[Priority: (high|medium|low)\]/i, "")
+                      .replace(/\[Created by AI Calendar Assistant\]/i, "")
+                      .trim();
+                  }
+                }
+
+                const formattedEvent = {
+                  id: event.data.id,
+                  title: event.data.summary || "Untitled Event",
+                  description: cleanDescription,
+                  startTime: event.data.start?.dateTime || event.data.start?.date,
+                  endTime: event.data.end?.dateTime || event.data.end?.date,
+                  priority: priority,
+                  isAllDay: !event.data.start?.dateTime && !!event.data.start?.date,
+                  calendarId: event.data.organizer?.email || "",
+                };
+                
+                return NextResponse.json(formattedEvent);
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching event from calendar ${calendarId}:`, err);
+            // Continue with next calendar
+          }
+        }
+        
+        // If we get here, the event wasn't found
+        return NextResponse.json(
+          { error: "Event not found" },
+          { status: 404 }
+        );
+      } catch (error) {
+        console.error("Error fetching specific event:", error);
+        
+        // Check if it's an auth error
+        if (String(error).includes("auth") || String(error).includes("token") || 
+            String(error).includes("unauthorized") || String(error).includes("unauthenticated")) {
+          return new NextResponse(
+            JSON.stringify({
+              message: "Authentication error",
+              error: "AuthenticationError",
+              redirect: true,
+              redirectUrl: "/auth",
+            }),
+            {
+              status: 401,
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+        }
+        
+        return NextResponse.json(
+          { error: "Failed to fetch event" },
+          { status: 500 }
+        );
+      }
+    }
 
     // Default to current month if not specified
     const now = new Date();
@@ -174,12 +275,52 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(formattedEvents);
     } catch (error: any) {
       console.error("Error fetching calendar events:", error);
+      
+      // If it's a specific Google API authentication error
+      if (error?.message?.includes("auth") || error?.message?.includes("token") || 
+          error?.code === 401 || error?.code === 403) {
+        return new NextResponse(
+          JSON.stringify({
+            message: "Google Calendar API authentication error",
+            error: "GoogleAuthError",
+            redirect: true,
+            redirectUrl: "/auth",
+          }),
+          {
+            status: 401,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
 
-      // Return empty array instead of mock tasks
+      // Return empty array for other errors
       return NextResponse.json([]);
     }
   } catch (error) {
     console.error("Error fetching tasks:", error);
+    
+    // Determine if it's an auth-related error
+    const errorStr = String(error);
+    if (errorStr.includes("auth") || errorStr.includes("token") || 
+        errorStr.includes("unauthorized") || errorStr.includes("unauthenticated")) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Authentication error",
+          error: "AuthenticationError",
+          redirect: true,
+          redirectUrl: "/auth",
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to fetch tasks" },
       { status: 500 }
@@ -487,6 +628,8 @@ export async function PUT(req: NextRequest) {
       return new NextResponse(JSON.stringify(response.data), { status: 200 });
     } catch (error: any) {
       console.error("Error updating event:", error);
+
+      // Return empty array instead of mock tasks
       return new NextResponse(
         JSON.stringify({
           message: "An error occurred while updating the event",

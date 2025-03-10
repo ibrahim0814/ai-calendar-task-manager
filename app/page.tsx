@@ -38,6 +38,7 @@ import {
 } from "./components/ui/dropdown-menu";
 import { format } from "date-fns";
 import Image from "next/image";
+import { AlertCircle } from "lucide-react";
 
 function HomePage() {
   const { user } = useAuth();
@@ -55,6 +56,7 @@ function HomePage() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [viewTaskDetails, setViewTaskDetails] = useState<Task | null>(null);
+  const [authError, setAuthError] = useState<boolean>(false);
 
   // Format date to display
   const formattedDate = useMemo(
@@ -106,23 +108,30 @@ function HomePage() {
         }
 
         const res = await fetch(`/api/tasks?month=${month}&year=${year}`);
-        const data = await res.json();
-
+        
+        // Check for HTTP errors first
         if (!res.ok) {
+          const data = await res.json();
           console.error("Error response from tasks API:", data);
 
-          // Check if we got a redirect response
-          if (data.redirect && data.redirectUrl) {
-            console.log("Session expired, redirecting to:", data.redirectUrl);
+          // Check if we got a redirect response or auth error
+          if (data.error === "NoRefreshTokenError" || data.error === "RefreshAccessTokenError" || 
+              (data.redirect && data.redirectUrl)) {
+            console.log("Authentication issue detected, redirecting to auth page");
             // Clear tasks before redirecting
             setTasks([]);
             setLoading(false);
-            window.location.href = data.redirectUrl;
+            // Force re-auth by signing out first
+            await signOut({ redirect: false });
+            window.location.href = "/auth";
             return;
           }
 
           throw new Error(`Error fetching tasks: ${res.status}`);
         }
+
+        // Parse the response data if it was successful
+        const data = await res.json();
 
         // Apply timezone correction to each task's times
         const tasksWithCorrectedTime = data.map((task: Task) => ({
@@ -139,6 +148,11 @@ function HomePage() {
       } catch (error) {
         console.error("Failed to fetch tasks:", error);
         setTasks([]);
+        // Handle unexpected errors - redirect to auth page if it might be an auth issue
+        if (String(error).includes("Failed to fetch") || String(error).includes("NetworkError")) {
+          console.log("Network error detected, may be auth related");
+          window.location.href = "/auth";
+        }
       } finally {
         setLoading(false);
       }
@@ -448,6 +462,18 @@ function HomePage() {
 
   // We're removing the task time update handler since it's not needed for this fix
 
+  // Add a function to handle force reauthentication
+  const handleForceReauth = async () => {
+    try {
+      console.log("Forcing reauthentication");
+      // Sign out and redirect to auth page
+      await signOut({ redirect: false });
+      window.location.href = "/auth";
+    } catch (error) {
+      console.error("Error during force reauthentication:", error);
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-950 text-white flex flex-col">
@@ -514,11 +540,36 @@ function HomePage() {
                     <LogOut className="h-4 w-4 mr-2" />
                     <span>Log out</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleForceReauth}
+                    className="cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    <span>Refresh Auth</span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
         </header>
+
+        {/* Auth Error Banner - show when there are auth issues */}
+        {authError && (
+          <div className="bg-red-900 text-white p-4 mb-6 rounded-md flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <p>Authentication issue detected. Please try refreshing your authentication.</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleForceReauth}
+              className="bg-red-800 text-white border-red-700 hover:bg-red-700 hover:text-white"
+            >
+              Refresh Auth
+            </Button>
+          </div>
+        )}
 
         <main
           className={`p-4 ${

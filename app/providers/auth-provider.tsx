@@ -8,7 +8,7 @@ import {
   useCallback,
 } from "react";
 import { useRouter } from "next/navigation";
-import { signIn, useSession, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 
 type AuthUser = {
   id: string;
@@ -20,14 +20,12 @@ type AuthUser = {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  signInWithGoogle: async () => {},
   logout: async () => {},
 });
 
@@ -65,22 +63,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProcessingAuth(false);
   }, [session, status]);
 
-  // Google sign in function
-  const signInWithGoogle = useCallback(async () => {
-    try {
-      if (processingAuth) return;
-      setProcessingAuth(true);
-
-      await signIn("google", {
-        redirect: false,
-        callbackUrl: "/",
-      });
-    } catch (error) {
-      console.error("Sign in error:", error);
-      setProcessingAuth(false);
-    }
-  }, [processingAuth]);
-
   // Logout function
   const logout = useCallback(async () => {
     try {
@@ -97,7 +79,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const contextValue: AuthContextType = {
     user,
     loading,
-    signInWithGoogle,
     logout,
   };
 
