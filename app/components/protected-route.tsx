@@ -42,7 +42,7 @@ export default function ProtectedRoute({
   // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         <p className="ml-2 text-sm text-slate-500">Loading...</p>
       </div>
@@ -56,7 +56,7 @@ export default function ProtectedRoute({
 
   // Show loading state while redirect happens
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
+    <div className="min-h-screen flex items-center justify-center bg-black">
       <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
       <p className="ml-2 text-sm text-slate-500">Redirecting...</p>
     </div>

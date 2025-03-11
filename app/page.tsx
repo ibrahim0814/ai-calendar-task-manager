@@ -476,7 +476,7 @@ function HomePage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+      <div className="min-h-screen bg-black text-white flex flex-col">
         <header className="border-b border-slate-800">
           <div className="flex items-center justify-between w-full px-4 py-4">
             <h1 className="text-xl font-bold flex items-center">

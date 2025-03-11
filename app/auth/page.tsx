@@ -64,7 +64,7 @@ export default function AuthPage() {
   // If still loading, show loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
         <p className="ml-2 text-sm text-slate-400">Loading authentication state...</p>
       </div>
@@ -74,7 +74,7 @@ export default function AuthPage() {
   // Only show login page if we're sure there's no user
   if (!loading && !user) {
     return (
-      <div className="min-h-screen flex bg-slate-950">
+      <div className="min-h-screen flex bg-black">
         {/* Left section - Sign in/Register */}
         <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10">
           <div className="w-full max-w-md backdrop-blur-lg bg-slate-900/80 p-8 rounded-xl shadow-2xl border border-slate-800">
@@ -204,7 +204,7 @@ export default function AuthPage() {
 
   // Loading placeholder while we wait for redirect to happen
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
+    <div className="min-h-screen flex items-center justify-center bg-black">
       <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
       <p className="ml-2 text-sm text-slate-400">Redirecting to dashboard...</p>
     </div>
