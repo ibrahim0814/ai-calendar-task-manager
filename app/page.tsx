@@ -523,17 +523,26 @@ function HomePage() {
                     onClick={async () => {
                       // Disable the UI immediately to prevent further interactions
                       setLoading(true);
-
+                      
+                      // Clear client-side state first to prevent hydration mismatch
+                      setTasks([]);
+                      
                       try {
-                        // Call signOut with callbackUrl to ensure proper redirect
-                        await signOut({
-                          callbackUrl: "/auth",
-                          redirect: true,
-                        });
+                        // Use the recommended pattern from Next.js docs:
+                        // 1. Sign out without redirect
+                        await signOut({ redirect: false });
+                        
+                        // 2. Wait a moment for state to update
+                        // 3. Then manually navigate
+                        setTimeout(() => {
+                          window.location.href = "/auth";
+                        }, 10);
                       } catch (error) {
                         console.error("Logout failed", error);
-                        // Fallback: force redirect if signOut fails
-                        window.location.href = "/auth";
+                        // Use the same approach in error case
+                        setTimeout(() => {
+                          window.location.href = "/auth";
+                        }, 10);
                       }
                     }}
                   >
@@ -593,25 +602,23 @@ function HomePage() {
                       {format(new Date(), "yyyy")}
                     </p>
                   </div>
-                  <div className="flex gap-3 flex-shrink-0">
-                    <div className="days-counter counter-month">
-                      <span className="text-blue-400 font-bold">
-                        {daysLeftInMonth}
-                      </span>
-                      <span className="text-slate-400 mt-0.5">days left</span>
-                      <span className="text-slate-400 text-[10px] mt-0.5">
-                        in month
-                      </span>
-                    </div>
-                    <div className="days-counter counter-year">
-                      <span className="text-purple-400 font-bold">
-                        {daysLeftInYear}
-                      </span>
-                      <span className="text-slate-400 mt-0.5">days left</span>
-                      <span className="text-slate-400 text-[10px] mt-0.5">
-                        in year
-                      </span>
-                    </div>
+                  <div className="days-counter counter-month">
+                    <span className="text-blue-400 font-bold">
+                      {daysLeftInMonth}
+                    </span>
+                    <span className="text-slate-400 mt-0.5">days left</span>
+                    <span className="text-slate-400 text-[10px] mt-0.5">
+                      in month
+                    </span>
+                  </div>
+                  <div className="days-counter counter-year">
+                    <span className="text-purple-400 font-bold">
+                      {daysLeftInYear}
+                    </span>
+                    <span className="text-slate-400 mt-0.5">days left</span>
+                    <span className="text-slate-400 text-[10px] mt-0.5">
+                      in year
+                    </span>
                   </div>
                 </div>
               </div>
@@ -696,7 +703,7 @@ function HomePage() {
               <div className="w-full md:w-1/3 md:border-l md:border-slate-800 md:pl-4 h-full overflow-hidden flex flex-col">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold">{formattedDate}</h2>
-                  <div className="flex gap-3 flex-shrink-0 hidden md:flex">
+                  <div className="hidden md:flex gap-3 flex-shrink-0">
                     <div className="days-counter counter-month">
                       <span className="text-blue-400 font-bold">
                         {daysLeftInMonth}

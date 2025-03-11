@@ -33,7 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingAuth, setProcessingAuth] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  // Set mounted state when component mounts (client-side only)
+  // This prevents hydration mismatches by ensuring we don't render
+  // different content during server-side rendering vs client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Get session data from NextAuth
   const { data: session, status } = useSession();
@@ -63,19 +71,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProcessingAuth(false);
   }, [session, status]);
 
-  // Logout function
+  // Logout function with hydration-safe implementation
   const logout = useCallback(async () => {
     try {
       if (processingAuth) return;
       setProcessingAuth(true);
-
-      await signOut({ redirect: false });
+      
+      // Important: First update our local state
+      // This prevents the UI from trying to render authenticated content
+      // during the transition, which helps avoid hydration mismatches
+      setUser(null);
+      
+      // Use a small delay to ensure React has time to reconcile state changes
+      // before triggering navigation, preventing the hydration mismatch
+      setTimeout(async () => {
+        await signOut({ 
+          callbackUrl: "/auth",
+          redirect: true 
+        });
+      }, 10);
     } catch (error) {
       console.error("Logout error:", error);
       setProcessingAuth(false);
     }
   }, [processingAuth]);
 
+  // Create context value with all authentication state
   const contextValue: AuthContextType = {
     user,
     loading,
@@ -83,10 +104,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 
+// Export the hook for components to access auth state
 export function useAuth() {
   return useContext(AuthContext);
 }
