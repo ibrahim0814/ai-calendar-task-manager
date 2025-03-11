@@ -453,64 +453,203 @@ export async function POST(req: NextRequest) {
       throw new Error("OpenAI API key is not set");
     }
 
-    // Extract tasks using OpenAI
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Extract tasks from the user's text input. For each task, provide a title, optional description, start time (in HH:mm format), estimated duration in minutes (15-480), and priority level. Follow time-blocking best practices and ensure tasks don't overlap. Tasks must have a duration of at least 15 minutes.",
-        },
-        {
-          role: "user",
-          content: body.description,
-        },
-      ],
-      functions: [
-        {
-          name: "extractTasks",
-          description: "Extract tasks from user input",
-          parameters: {
-            type: "object",
-            properties: {
-              tasks: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    title: { type: "string" },
-                    description: { type: "string" },
-                    startTime: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
-                    duration: { type: "number", minimum: 15, maximum: 480 },
-                    priority: {
-                      type: "string",
-                      enum: ["high", "medium", "low"],
+    // Extract tasks using OpenAI with retry mechanism
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 1000;
+    
+    // Helper function to wait for a specific amount of time
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    
+    // Helper function to make OpenAI API call with retries
+    const extractTasksWithRetry = async (input: string, retries = MAX_RETRIES): Promise<any> => {
+      try {
+        console.log(`Attempting OpenAI task extraction (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`);
+        
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Extract tasks from the user's text input. For each task, provide a title, optional description, start time (in HH:mm format), estimated duration in minutes (15-480), and priority level. Follow time-blocking best practices and ensure tasks don't overlap. Tasks must have a duration of at least 15 minutes.",
+            },
+            {
+              role: "user",
+              content: input,
+            },
+          ],
+          functions: [
+            {
+              name: "extractTasks",
+              description: "Extract tasks from user input",
+              parameters: {
+                type: "object",
+                properties: {
+                  tasks: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        title: { type: "string" },
+                        description: { type: "string" },
+                        startTime: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+                        duration: { type: "number", minimum: 15, maximum: 480 },
+                        priority: {
+                          type: "string",
+                          enum: ["high", "medium", "low"],
+                        },
+                      },
+                      required: ["title", "startTime", "duration", "priority"],
                     },
                   },
-                  required: ["title", "startTime", "duration", "priority"],
                 },
+                required: ["tasks"],
               },
             },
-            required: ["tasks"],
-          },
-        },
-      ],
-      function_call: { name: "extractTasks" },
-    });
-
-    console.log("OpenAI response:", JSON.stringify(completion));
+          ],
+          function_call: { name: "extractTasks" },
+        });
+        
+        console.log("OpenAI response:", JSON.stringify(completion));
+        
+        return completion;
+      } catch (error) {
+        if (retries <= 0) {
+          console.error("All OpenAI API retries failed:", error);
+          throw error;
+        }
+        
+        console.warn(`OpenAI API request failed, retrying (${retries} retries left):`, error);
+        await sleep(RETRY_DELAY_MS * (MAX_RETRIES - retries + 1)); // Exponential backoff
+        return extractTasksWithRetry(input, retries - 1);
+      }
+    };
+    
+    // Call the extraction function with retry
+    let completion;
+    try {
+      completion = await extractTasksWithRetry(body.description);
+    } catch (error) {
+      console.error("Failed to extract tasks after all retries:", error);
+      // Create a default task as fallback
+      const defaultTask = {
+        title: "Task from Natural Language Input",
+        description: body.description,
+        startTime: "09:00",
+        duration: 60,
+        priority: "medium"
+      };
+      return NextResponse.json([defaultTask]);
+    }
 
     const functionCall = completion.choices[0].message.function_call;
     if (!functionCall?.arguments) {
       throw new Error("No tasks extracted");
     }
 
-    const { tasks } = JSON.parse(functionCall.arguments);
-    // Validate tasks with zod schema
+    // Add robust error handling around JSON parsing
+    let tasks = [];
+    try {
+      // First attempt to parse the JSON response
+      const parsedArguments = JSON.parse(functionCall.arguments);
+      tasks = parsedArguments.tasks || [];
+    } catch (parseError) {
+      console.error("Error parsing OpenAI response:", parseError);
+      
+      // Attempt to fix common JSON issues and try again
+      try {
+        // Try to sanitize the JSON string - replace any unescaped quotes, fix missing commas, etc.
+        let sanitizedJson = functionCall.arguments
+          .replace(/\n/g, ' ')
+          .replace(/\\'/g, "'")
+          .replace(/\\/g, "\\\\")
+          .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3'); // Ensure property names are quoted
+        
+        const parsedArguments = JSON.parse(sanitizedJson);
+        tasks = parsedArguments.tasks || [];
+        
+        if (!tasks.length) {
+          // If still no tasks, make one last attempt with a more aggressive approach
+          // Extract anything that looks like a task object
+          const taskRegex = /\{\s*"title":\s*"([^"]+)"[^}]+\}/g;
+          const taskMatches = sanitizedJson.match(taskRegex) || [];
+          
+          tasks = taskMatches.map((taskStr: string) => {
+            try {
+              return JSON.parse(taskStr);
+            } catch {
+              // Extract individual fields using regex if JSON parsing fails
+              const titleMatch = taskStr.match(/"title":\s*"([^"]+)"/);
+              const startTimeMatch = taskStr.match(/"startTime":\s*"([^"]+)"/);
+              const durationMatch = taskStr.match(/"duration":\s*(\d+)/);
+              const priorityMatch = taskStr.match(/"priority":\s*"([^"]+)"/);
+              
+              const title = titleMatch && titleMatch[1] ? titleMatch[1] : "Untitled Task";
+              const startTime = startTimeMatch && startTimeMatch[1] ? startTimeMatch[1] : "09:00";
+              const duration = durationMatch && durationMatch[1] ? parseInt(durationMatch[1]) : 30;
+              const priority = priorityMatch && priorityMatch[1] ? priorityMatch[1] : "medium";
+              
+              return { title, startTime, duration, priority };
+            }
+          });
+        }
+      } catch (fallbackError) {
+        console.error("Failed to recover from invalid JSON:", fallbackError);
+        
+        // Last resort: create a default task with the original input as the description
+        tasks = [{
+          title: "Task from Natural Language Input",
+          description: body.description,
+          startTime: "09:00", 
+          duration: 60,
+          priority: "medium"
+        }];
+      }
+    }
+
+    // Ensure we have at least one task
+    if (!tasks.length) {
+      tasks = [{
+        title: "Task from Natural Language Input",
+        description: body.description,
+        startTime: "09:00", 
+        duration: 60,
+        priority: "medium"
+      }];
+    }
+
+    // Validate tasks with zod schema - with more robust error handling
     const validTasks = tasks
-      .filter((task: any) => task.duration > 0)
-      .map((task: any) => taskExtractSchema.parse(task));
+      .filter((task: any) => {
+        try {
+          // Only include tasks with a duration > 0
+          return task && typeof task === 'object' && task.duration > 0;
+        } catch {
+          return false;
+        }
+      })
+      .map((task: any) => {
+        try {
+          // Try to parse with zod schema but provide defaults if needed
+          return taskExtractSchema.parse({
+            title: task?.title || "Untitled Task",
+            description: task?.description || "",
+            startTime: task?.startTime && /^\d{2}:\d{2}$/.test(task?.startTime) ? task.startTime : "09:00",
+            duration: typeof task?.duration === 'number' && task?.duration >= 15 && task?.duration <= 480 ? task.duration : 60,
+            priority: ["high", "medium", "low"].includes(task?.priority || "") ? task?.priority : "medium"
+          });
+        } catch (zodError) {
+          // If zod validation fails, create a valid task with available info
+          console.error("Task validation error:", zodError);
+          return {
+            title: task?.title || "Untitled Task",
+            description: task?.description || "",
+            startTime: "09:00",
+            duration: 60,
+            priority: "medium"
+          };
+        }
+      });
 
     console.log("Valid tasks:", JSON.stringify(validTasks));
 

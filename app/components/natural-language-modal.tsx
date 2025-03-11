@@ -68,6 +68,13 @@ export default function NaturalLanguageModal({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null); // Start with no date selected
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Function to remove a task from the list
+  const removeTask = useCallback((indexToRemove: number) => {
+    setExtractedTasks((prevTasks) =>
+      prevTasks.filter((_, index) => index !== indexToRemove)
+    );
+  }, []);
+
   // Add effect for click-outside handling
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -627,6 +634,67 @@ export default function NaturalLanguageModal({
     }
   }, []);
 
+  // Function to update the date for all tasks
+  const updateAllTaskDates = useCallback((date: Date) => {
+    if (!date) {
+      console.warn("Attempted to update tasks with a null or undefined date");
+      return;
+    }
+
+    try {
+      // Create a clean date object without time component
+      const cleanDate = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      );
+
+      console.log("Setting date for all tasks:", cleanDate.toISOString());
+
+      setExtractedTasks((prevTasks) => {
+        const newTasks = prevTasks.map((task) => {
+          // Create a new Date object for each task to prevent reference issues
+          return {
+            ...task,
+            date: new Date(cleanDate),
+          };
+        });
+
+        console.log(
+          "Updated tasks with new dates:",
+          newTasks.map((t) => ({
+            title: t.title,
+            date: t.date ? t.date.toISOString() : null,
+          }))
+        );
+
+        return newTasks;
+      });
+
+      // Set the selected date (for UI highlighting)
+      setSelectedDate(cleanDate);
+      console.log("Selected date updated to:", cleanDate.toISOString());
+
+      // Close any open date pickers
+      setShowDatePicker(false);
+
+      // Clear session storage for all task date pickers
+      for (let i = 0; i < 20; i++) {
+        // Assuming no more than 20 tasks
+        sessionStorage.removeItem(`taskDatePickerOpen-${i}`);
+      }
+
+      // Ensure a re-render occurs to reflect all the changes
+      setTimeout(() => {
+        setExtractedTasks((prev) => {
+          return prev.map((task) => ({ ...task }));
+        });
+      }, 0);
+    } catch (error) {
+      console.error("Error updating task dates:", error);
+    }
+  }, []);
+
   // Input step rendering
   const renderInputStep = () => (
     <form onSubmit={handleExtractTasks}>
@@ -1019,6 +1087,34 @@ export default function NaturalLanguageModal({
                 >
                   <EditIcon className="h-3 w-3" />
                 </Button>
+
+                {/* Add Remove Task Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeTask(index)}
+                  className="h-6 w-6 p-0 rounded-full text-red-400 hover:text-red-300 hover:bg-red-900/30 ml-1"
+                  aria-label="Remove task"
+                  title="Remove task"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                </Button>
               </>
             )}
           </div>
@@ -1026,67 +1122,6 @@ export default function NaturalLanguageModal({
       ))}
     </div>
   );
-
-  // Function to update the date for all tasks
-  const updateAllTaskDates = useCallback((date: Date) => {
-    if (!date) {
-      console.warn("Attempted to update tasks with a null or undefined date");
-      return;
-    }
-
-    try {
-      // Create a clean date object without time component
-      const cleanDate = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate()
-      );
-
-      console.log("Setting date for all tasks:", cleanDate.toISOString());
-
-      setExtractedTasks((prevTasks) => {
-        const newTasks = prevTasks.map((task) => {
-          // Create a new Date object for each task to prevent reference issues
-          return {
-            ...task,
-            date: new Date(cleanDate),
-          };
-        });
-
-        console.log(
-          "Updated tasks with new dates:",
-          newTasks.map((t) => ({
-            title: t.title,
-            date: t.date ? t.date.toISOString() : null,
-          }))
-        );
-
-        return newTasks;
-      });
-
-      // Set the selected date (for UI highlighting)
-      setSelectedDate(cleanDate);
-      console.log("Selected date updated to:", cleanDate.toISOString());
-
-      // Close any open date pickers
-      setShowDatePicker(false);
-
-      // Clear session storage for all task date pickers
-      for (let i = 0; i < 20; i++) {
-        // Assuming no more than 20 tasks
-        sessionStorage.removeItem(`taskDatePickerOpen-${i}`);
-      }
-
-      // Ensure a re-render occurs to reflect all the changes
-      setTimeout(() => {
-        setExtractedTasks((prev) => {
-          return prev.map((task) => ({ ...task }));
-        });
-      }, 0);
-    } catch (error) {
-      console.error("Error updating task dates:", error);
-    }
-  }, []);
 
   // Mobile-specific confirmation step
   const renderMobileConfirmationStep = () => (
