@@ -39,7 +39,7 @@ export const authOptions: NextAuthOptions = {
           scope:
             "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile",
           access_type: "offline",
-          // No prompt by default - will be set dynamically based on the signIn flow
+          prompt: "consent",
         },
       },
     }),
@@ -50,7 +50,7 @@ export const authOptions: NextAuthOptions = {
   debug: true,
   session: {
     strategy: "jwt",
-    maxAge: 14 * 24 * 60 * 60, // 14 days (2 weeks)
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   cookies: {
     sessionToken: {
@@ -60,26 +60,47 @@ export const authOptions: NextAuthOptions = {
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        maxAge: 14 * 24 * 60 * 60, // 14 days (2 weeks)
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
       },
     },
   },
   pages: {
-    signIn: '/auth', // Custom sign-in page
+    signIn: "/auth", // Custom sign-in page
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
       // If no callbackUrl is provided, use the default baseUrl
-      if (!url.startsWith('/')) {
-        return baseUrl
+      if (!url.startsWith("/")) {
+        return baseUrl;
       }
       // Otherwise, return the provided callback URL
-      return url.startsWith(baseUrl) ? url : baseUrl
+      return url.startsWith(baseUrl) ? url : baseUrl;
     },
     async jwt({ token, account }) {
       // Initial sign in
       if (account) {
-        console.log("JWT Callback - Processing initial sign in from lib/auth.ts");
+        console.log(
+          "JWT Callback - Processing initial sign in from lib/auth.ts"
+        );
         return {
           ...token,
           accessToken: account.access_token,
@@ -98,7 +119,9 @@ export const authOptions: NextAuthOptions = {
       }
 
       // Access token has expired, try to update it using refresh token
-      console.log("JWT Callback - Token expired, attempting refresh from lib/auth.ts");
+      console.log(
+        "JWT Callback - Token expired, attempting refresh from lib/auth.ts"
+      );
       if (!token.refreshToken) {
         console.error("No refresh token available in lib/auth.ts");
         return { ...token, error: "NoRefreshTokenError" };
@@ -138,7 +161,7 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       console.log("Session Callback - token exists:", !!token);
-      
+
       if (token) {
         session.accessToken = token.accessToken;
         session.refreshToken = token.refreshToken;
@@ -159,12 +182,12 @@ export async function auth(): Promise<Session | null> {
   try {
     const session = (await getServerSession(authOptions)) as Session | null;
     console.log("Session exists:", !!session);
-    
+
     // Log if there are any errors in the session
     if (session?.error) {
       console.error("Session has error:", session.error);
     }
-    
+
     return session;
   } catch (error) {
     console.error("Error getting server session:", error);

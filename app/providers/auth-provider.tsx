@@ -37,14 +37,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   // Set mounted state when component mounts (client-side only)
-  // This prevents hydration mismatches by ensuring we don't render
-  // different content during server-side rendering vs client
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Get session data from NextAuth
-  const { data: session, status } = useSession();
+  // Get session data from NextAuth with additional options for persistence
+  const { data: session, status } = useSession({
+    required: false,
+    onUnauthenticated() {
+      // Don't redirect - let the middleware handle it
+      console.log("Unauthenticated user");
+    },
+  });
 
   // Update user state when session changes
   useEffect(() => {
@@ -61,9 +65,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: session.user.name,
         image: session.user.image,
       });
+
+      // Store session info in localStorage for persistence checks
+      if (typeof window !== "undefined") {
+        localStorage.setItem("userLoggedIn", "true");
+        localStorage.setItem("userEmail", session.user.email as string);
+      }
     } else {
       // No valid session
       setUser(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("userLoggedIn");
+        localStorage.removeItem("userEmail");
+      }
     }
 
     // Only set loading to false after we've processed the session
@@ -76,18 +90,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (processingAuth) return;
       setProcessingAuth(true);
-      
+
       // Important: First update our local state
-      // This prevents the UI from trying to render authenticated content
-      // during the transition, which helps avoid hydration mismatches
       setUser(null);
-      
+
+      // Clear local storage items
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("userLoggedIn");
+        localStorage.removeItem("userEmail");
+      }
+
       // Use a small delay to ensure React has time to reconcile state changes
-      // before triggering navigation, preventing the hydration mismatch
       setTimeout(async () => {
-        await signOut({ 
+        await signOut({
           callbackUrl: "/auth",
-          redirect: true 
+          redirect: true,
         });
       }, 10);
     } catch (error) {
@@ -104,9 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }
 

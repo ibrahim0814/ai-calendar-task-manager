@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
 import { AuthProvider } from "../providers/auth-provider";
 import { QueryProvider } from "../providers/query-provider";
-import React from "react"
-import { ThemeProvider } from "next-themes"
-import { SessionProvider } from "next-auth/react"
+import React from "react";
+import { ThemeProvider } from "next-themes";
+import { SessionProvider } from "next-auth/react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <QueryProvider>
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
@@ -17,5 +17,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
         </AuthProvider>
       </QueryProvider>
     </SessionProvider>
-  )
+  );
 }
